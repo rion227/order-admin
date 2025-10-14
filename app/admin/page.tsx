@@ -22,12 +22,14 @@ type ListResp = {
   error?: string;
 };
 
+type StatusFilter = "" | "pending" | "completed" | "cancelled";
+
 export default function AdminPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [orders, setOrders] = useState<Order[]>([]);
   const [pendingCount, setPendingCount] = useState(0);
-  const [statusFilter, setStatusFilter] = useState<"" | "pending" | "completed" | "cancelled">("");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("");
   const [error, setError] = useState<string | null>(null);
 
   // ===== API =====
@@ -43,8 +45,9 @@ export default function AdminPage() {
       setOrders(json.items);
       setPendingCount(json.pending_count);
       setError(null);
-    } catch (e: any) {
-      setError(e?.message ?? "通信エラー");
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      setError(msg);
     } finally {
       setLoading(false);
     }
@@ -67,10 +70,11 @@ export default function AdminPage() {
       }
       // 未処理件数の取り直し
       fetchList();
-    } catch (e: any) {
+    } catch (e: unknown) {
       // 失敗したら元に戻す
       setOrders(prev);
-      alert(e?.message ?? "更新に失敗しました");
+      const msg = e instanceof Error ? e.message : String(e);
+      alert(msg || "更新に失敗しました");
     }
   }
 
@@ -83,12 +87,14 @@ export default function AdminPage() {
   useEffect(() => {
     setLoading(true);
     fetchList();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [statusFilter]);
 
   // 5秒ごとに自動更新（最新の件数/一覧を軽く取る）
   useEffect(() => {
     const t = setInterval(fetchList, 5000);
     return () => clearInterval(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [statusFilter]);
 
   const grouped = useMemo(() => {
@@ -112,7 +118,9 @@ export default function AdminPage() {
             <select
               className="rounded-lg border px-3 py-1.5 text-sm"
               value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value as any)}
+              onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
+                setStatusFilter(e.target.value as StatusFilter)
+              }
             >
               <option value="">すべて</option>
               <option value="pending">未処理のみ</option>
@@ -128,7 +136,7 @@ export default function AdminPage() {
               更新
             </button>
 
-            {/* ログアウトボタン（リクエストどおり追加） */}
+            {/* ログアウトボタン */}
             <button
               onClick={logout}
               className="rounded-lg bg-gray-900 text-white px-3 py-1.5 text-sm"
