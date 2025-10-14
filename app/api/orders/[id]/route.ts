@@ -8,6 +8,7 @@ export const dynamic = "force-dynamic";
 
 const THIS_ORIGIN = process.env.NEXT_PUBLIC_SITE_ORIGIN || "http://localhost:3000";
 const ALLOWED_ORIGINS = new Set(["http://localhost:3000", THIS_ORIGIN]);
+
 function corsHeaders(origin: string | null) {
   const allow = origin && ALLOWED_ORIGINS.has(origin) ? origin : "";
   return {
@@ -27,9 +28,13 @@ const PatchSchema = z.object({
   status: z.enum(["completed", "cancelled", "pending"]),
 });
 
-export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(
+  req: NextRequest,
+  // ★ Next.js 15: params は Promise で渡ってくる
+  ctx: { params: Promise<{ id: string }> }
+) {
   const headers = corsHeaders(req.headers.get("origin"));
-  const id = params.id;
+  const { id } = await ctx.params; // ← await が必要
 
   try {
     const body = await req.json().catch(() => ({}));
