@@ -7,11 +7,8 @@ import { nanoid } from "nanoid";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-// ---- CORS 設定（注文サイトや管理サイトの Origin を並べる）----
-const ALLOWED_ORIGINS = new Set([
-  "http://localhost:3000", // 開発中
-  // "https://your-order-site.example", // 後で本番Originを追加
-]);
+const THIS_ORIGIN = process.env.NEXT_PUBLIC_SITE_ORIGIN || "http://localhost:3000";
+const ALLOWED_ORIGINS = new Set(["http://localhost:3000", THIS_ORIGIN]);
 
 function corsHeaders(origin: string | null) {
   const allow = origin && ALLOWED_ORIGINS.has(origin) ? origin : "";
@@ -28,14 +25,12 @@ export async function OPTIONS(req: NextRequest) {
   return new NextResponse(null, { status: 204, headers });
 }
 
-// ---- 入力バリデーション ----
 const ItemSchema = z.object({
   id: z.string().min(1),
   name: z.string().min(1),
   qty: z.number().int().positive(),
   price: z.number().nonnegative().optional(),
 });
-
 const OrderInputSchema = z.object({
   items: z.array(ItemSchema).min(1),
   note: z.string().max(500).optional(),
@@ -50,7 +45,6 @@ function generateOrderNo() {
   return `ORD-${y}${m}${day}-${short}`;
 }
 
-// ====== POST: 注文を保存（直送） ======
 export async function POST(req: NextRequest) {
   const origin = req.headers.get("origin");
   const headers = corsHeaders(origin);
@@ -65,7 +59,6 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Idempotency（再送防止）
     const idem = req.headers.get("Idempotency-Key") || null;
     if (idem) {
       const { data: existed, error: findErr } = await supabaseAdmin
@@ -95,21 +88,20 @@ export async function POST(req: NextRequest) {
       .single();
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500, headers });
-
     return NextResponse.json({ ok: true, order: data }, { status: 200, headers });
-  } catch (e: any) {
-    return NextResponse.json({ error: e?.message ?? "Unknown error" }, { status: 500, headers });
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e);
+    return NextResponse.json({ error: msg }, { status: 500, headers });
   }
 }
 
-// ====== GET: 一覧取得＋未処理件数 ======
 export async function GET(req: NextRequest) {
   const origin = req.headers.get("origin");
   const headers = corsHeaders(origin);
 
   try {
     const { searchParams } = new URL(req.url);
-    const status = searchParams.get("status"); // pending|completed|cancelled|null(全件)
+    const status = searchParams.get("status");
     const limit = Math.min(parseInt(searchParams.get("limit") || "50", 10), 100);
     const offset = parseInt(searchParams.get("offset") || "0", 10);
 
@@ -123,26 +115,16 @@ export async function GET(req: NextRequest) {
 
     const [{ data: rows, error, count }, { count: pending_count }] = await Promise.all([
       query,
-      supabaseAdmin
-        .from("orders")
-        .select("id", { count: "exact", head: true })
-        .eq("status", "pending"),
+      supabaseAdmin.from("orders").select("id", { count: "exact", head: true }).eq("status", "pending"),
     ]);
-
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500, headers });
-    }
+    if (error) return NextResponse.json({ error: error.message }, { status: 500, headers });
 
     return NextResponse.json(
-      {
-        ok: true,
-        items: rows ?? [],
-        total_count: count ?? 0,
-        pending_count: pending_count ?? 0,
-      },
+      { ok: true, items: rows ?? [], total_count: count ?? 0, pending_count: pending_count ?? 0 },
       { status: 200, headers }
     );
-  } catch (e: any) {
-    return NextResponse.json({ error: e?.message ?? "Unknown error" }, { status: 500, headers });
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e);
+    return NextResponse.json({ error: msg }, { status: 500, headers });
   }
 }

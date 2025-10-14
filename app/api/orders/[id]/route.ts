@@ -6,10 +6,8 @@ import { supabaseAdmin } from "@/lib/supabaseAdmin";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const ALLOWED_ORIGINS = new Set([
-  "http://localhost:3000",
-  // "https://your-admin-site.example", // 本番で追加
-]);
+const THIS_ORIGIN = process.env.NEXT_PUBLIC_SITE_ORIGIN || "http://localhost:3000";
+const ALLOWED_ORIGINS = new Set(["http://localhost:3000", THIS_ORIGIN]);
 function corsHeaders(origin: string | null) {
   const allow = origin && ALLOWED_ORIGINS.has(origin) ? origin : "";
   return {
@@ -29,10 +27,7 @@ const PatchSchema = z.object({
   status: z.enum(["completed", "cancelled", "pending"]),
 });
 
-export async function PATCH(
-  req: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   const headers = corsHeaders(req.headers.get("origin"));
   const id = params.id;
 
@@ -53,15 +48,12 @@ export async function PATCH(
       .select()
       .single();
 
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500, headers });
-    }
-    if (!data) {
-      return NextResponse.json({ error: "Not found" }, { status: 404, headers });
-    }
+    if (error) return NextResponse.json({ error: error.message }, { status: 500, headers });
+    if (!data) return NextResponse.json({ error: "Not found" }, { status: 404, headers });
 
     return NextResponse.json({ ok: true, order: data }, { status: 200, headers });
-  } catch (e: any) {
-    return NextResponse.json({ error: e?.message ?? "Unknown error" }, { status: 500, headers });
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e);
+    return NextResponse.json({ error: msg }, { status: 500, headers });
   }
 }

@@ -1,7 +1,7 @@
 // app/admin/login/page.tsx
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 
 export default function AdminLoginPage() {
@@ -30,15 +30,14 @@ export default function AdminLoginPage() {
         setLoading(false);
         return;
       }
-      // クッキーがセットされるので /admin へ移動
       router.replace(nextPath);
-    } catch (e: any) {
-      setErr(e?.message ?? "エラーが発生しました");
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      setErr(msg);
       setLoading(false);
     }
   }
 
-  // ちょい簡単な見た目（Tailwind）
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
       <form
@@ -63,9 +62,9 @@ export default function AdminLoginPage() {
         )}
 
         <button
-          type="submit"
-          disabled={loading}
-          className="w-full rounded-xl bg-black text-white py-2.5 font-medium disabled:opacity-60"
+            type="submit"
+            disabled={loading}
+            className="w-full rounded-xl bg-black text-white py-2.5 font-medium disabled:opacity-60"
         >
           {loading ? "確認中…" : "ログイン"}
         </button>
@@ -77,3 +76,4 @@ export default function AdminLoginPage() {
     </div>
   );
 }
+
