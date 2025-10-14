@@ -3,43 +3,41 @@ import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 
 const ADMIN_PREFIX = "/admin";
-const PUBLIC_PATHS = new Set([
-  "/admin/login",        // ログインページは誰でも見れる
-]);
 
-export function middleware(req: NextRequest) {
-  const { pathname } = req.nextUrl;
-
-  // /admin 配下だけを見る（/admin と /admin/...）
-  const isAdminArea =
-    pathname === ADMIN_PREFIX || pathname.startsWith(ADMIN_PREFIX + "/");
-
-  if (!isAdminArea) {
-    // それ以外のパスは素通り
-    return NextResponse.next();
-  }
-
-  // /admin/login は素通り
-  if (PUBLIC_PATHS.has(pathname)) {
-    return NextResponse.next();
-  }
-
-  // クッキーに "admin_auth=1" があればログイン扱い
-  const cookie = req.cookies.get("admin_auth")?.value;
-  const isAuthed = cookie === "1";
-
-  if (isAuthed) {
-    return NextResponse.next();
-  }
-
-  // 未ログイン → /admin/login にリダイレクト（元の場所は next= で渡す）
-  const loginUrl = req.nextUrl.clone();
-  loginUrl.pathname = "/admin/login";
-  loginUrl.searchParams.set("next", pathname);
-  return NextResponse.redirect(loginUrl);
+// ログインページ配下は常に素通り（/admin/login, /admin/login?next=... など）
+function isLoginPath(pathname: string) {
+  return pathname === "/admin/login" || pathname.startsWith("/admin/login/");
 }
 
-// ミドルウェアを有効にする対象
+export function middleware(req: NextRequest) {
+  try {
+    const url = req.nextUrl;
+    const { pathname, search } = url;
+
+    // /admin 配下以外は関知しない
+    const isAdminArea =
+      pathname === ADMIN_PREFIX || pathname.startsWith(ADMIN_PREFIX + "/");
+    if (!isAdminArea) return NextResponse.next();
+
+    // ログインページは必ず通す
+    if (isLoginPath(pathname)) return NextResponse.next();
+
+    // クッキーで簡易認証
+    const isAuthed = req.cookies.get("admin_auth")?.value === "1";
+    if (isAuthed) return NextResponse.next();
+
+    // 未ログイン → /admin/login?next=<元のパス+クエリ> にリダイレクト
+    const loginUrl = new URL("/admin/login", req.url);
+    const nextParam = pathname + (search || "");
+    loginUrl.searchParams.set("next", nextParam);
+    return NextResponse.redirect(loginUrl);
+  } catch {
+    // ここで落ちると 500 になるので、念のため素通りにする
+    return NextResponse.next();
+  }
+}
+
+// /admin と /admin/... の両方で作動
 export const config = {
-  matcher: ["/admin/:path*"],
+  matcher: ["/admin", "/admin/:path*"],
 };
