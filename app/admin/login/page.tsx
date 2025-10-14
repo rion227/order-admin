@@ -1,10 +1,20 @@
 // app/admin/login/page.tsx
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 
+export const dynamic = "force-dynamic"; // ← 事前レンダリングを避ける
+
 export default function AdminLoginPage() {
+  return (
+    <Suspense fallback={<div className="p-6 text-sm text-gray-500">読み込み中…</div>}>
+      <LoginInner />
+    </Suspense>
+  );
+}
+
+function LoginInner() {
   const sp = useSearchParams();
   const router = useRouter();
   const [password, setPassword] = useState("");
@@ -62,9 +72,9 @@ export default function AdminLoginPage() {
         )}
 
         <button
-            type="submit"
-            disabled={loading}
-            className="w-full rounded-xl bg-black text-white py-2.5 font-medium disabled:opacity-60"
+          type="submit"
+          disabled={loading}
+          className="w-full rounded-xl bg-black text-white py-2.5 font-medium disabled:opacity-60"
         >
           {loading ? "確認中…" : "ログイン"}
         </button>
@@ -76,4 +86,3 @@ export default function AdminLoginPage() {
     </div>
   );
 }
-
