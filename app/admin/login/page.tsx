@@ -1,27 +1,16 @@
 // app/admin/login/page.tsx
 "use client";
 
-import { Suspense, useState } from "react";
-import { useSearchParams, useRouter } from "next/navigation";
+import { useState } from "react";
+import { useRouter } from "next/navigation";
 
-export const dynamic = "force-dynamic"; // ← 事前レンダリングを避ける
+export const dynamic = "force-dynamic";
 
 export default function AdminLoginPage() {
-  return (
-    <Suspense fallback={<div className="p-6 text-sm text-gray-500">読み込み中…</div>}>
-      <LoginInner />
-    </Suspense>
-  );
-}
-
-function LoginInner() {
-  const sp = useSearchParams();
   const router = useRouter();
   const [password, setPassword] = useState("");
-  const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-
-  const nextPath = sp.get("next") || "/admin";
+  const [loading, setLoading] = useState(false);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -35,53 +24,30 @@ function LoginInner() {
         body: JSON.stringify({ password }),
       });
       const json = await res.json();
-      if (!res.ok || !json.ok) {
-        setErr(json.error || "ログインに失敗しました");
-        setLoading(false);
-        return;
-      }
-      router.replace(nextPath);
+      if (!res.ok || !json.ok) throw new Error(json.error || "ログインに失敗しました");
+      router.replace("/admin");
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : String(e);
-      setErr(msg);
+      setErr(e instanceof Error ? e.message : String(e));
       setLoading(false);
     }
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
-      <form
-        onSubmit={onSubmit}
-        className="w-full max-w-sm bg-white rounded-2xl shadow p-6 space-y-4"
-      >
-        <h1 className="text-xl font-semibold text-gray-800">管理ログイン</h1>
-        <label className="block">
-          <span className="text-sm text-gray-600">パスワード</span>
-          <input
-            type="password"
-            className="mt-1 w-full rounded-xl border border-gray-300 px-3 py-2 outline-none focus:ring-2 focus:ring-black/20"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            placeholder="入力してください"
-            required
-          />
-        </label>
-
-        {err && (
-          <p className="text-sm text-red-600 bg-red-50 rounded-lg p-2">{err}</p>
-        )}
-
-        <button
-          type="submit"
-          disabled={loading}
-          className="w-full rounded-xl bg-black text-white py-2.5 font-medium disabled:opacity-60"
-        >
+    <div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",background:"#f6f7f8"}}>
+      <form onSubmit={onSubmit} style={{background:"#fff",padding:24,borderRadius:16,boxShadow:"0 4px 20px rgba(0,0,0,.06)",width:320}}>
+        <h1 style={{fontSize:18,fontWeight:600,marginBottom:12}}>管理ログイン</h1>
+        <label style={{display:"block",fontSize:12,color:"#555"}}>パスワード</label>
+        <input
+          type="password"
+          value={password}
+          onChange={(e)=>setPassword(e.target.value)}
+          required
+          style={{width:"100%",padding:"10px 12px",border:"1px solid #d0d5dd",borderRadius:10,marginTop:6}}
+        />
+        {err && <p style={{color:"#b42318",background:"#fee4e2",border:"1px solid #fecdca",padding:8,borderRadius:8,marginTop:8,fontSize:12}}>{err}</p>}
+        <button disabled={loading} style={{width:"100%",marginTop:12,background:"#111",color:"#fff",padding:"10px 12px",borderRadius:10}}>
           {loading ? "確認中…" : "ログイン"}
         </button>
-
-        <p className="text-xs text-gray-500">
-          成功すると管理ページ（{nextPath}）に移動します。
-        </p>
       </form>
     </div>
   );
