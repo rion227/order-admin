@@ -33,12 +33,11 @@ if (typeof window !== "undefined" && SUPABASE_URL && SUPABASE_ANON) {
   supabase = createClient(SUPABASE_URL, SUPABASE_ANON);
 }
 
-// 安全に JSON を読む（空や非 JSON は {} を返す）
+// 安全に JSON を読む（空や非 JSON なら {}）
 async function safeJson<T = any>(res: Response): Promise<T | {}> {
   try {
     const ct = res.headers.get("content-type") || "";
     if (!ct.includes("json")) return {};
-    // 空ボディ対策
     const text = await res.text();
     if (!text) return {};
     return JSON.parse(text) as T;
@@ -64,6 +63,10 @@ export default function AdminPage() {
 
   // STOPトグル
   const [isStopped, setIsStopped] = useState(false);
+
+  // リセット確認モーダル
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [confirmBusy, setConfirmBusy] = useState(false);
 
   const playNotify = () => {
     if (!soundEnabled) return;
@@ -182,6 +185,31 @@ export default function AdminPage() {
     }
   }
 
+  // リセット実行（処理済み＝完了/キャンセルのみ削除）
+  async function execResetProcessedOnly() {
+    setConfirmBusy(true);
+    try {
+      const r = await fetch("/api/orders/reset", {
+        method: "POST",
+        credentials: "include",
+      });
+      const j = (await safeJson(r)) as any;
+      if (!r.ok || j?.ok === false) {
+        throw new Error(j?.error || `リセットに失敗しました（HTTP ${r.status}）`);
+      }
+      // 表示側の一時リセット（未処理は残す）
+      setOrders((cur) => cur.filter((o) => o.status === "pending"));
+      setError(null);
+      await fetchList();
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      alert(msg || "リセットに失敗しました");
+    } finally {
+      setConfirmBusy(false);
+      setConfirmOpen(false);
+    }
+  }
+
   // 初回＆フィルタ変更時に取得
   useEffect(() => {
     setLoading(true);
@@ -253,7 +281,8 @@ export default function AdminPage() {
     }
   };
 
-  const onReset = () => {
+  // 画面だけの簡易リセット（フィルタやエラー、既知IDなど）
+  const onSoftResetView = () => {
     setStatusFilter("");
     setError(null);
     setBuzzIds(new Set());
@@ -285,10 +314,12 @@ export default function AdminPage() {
               🔔 {soundEnabled ? "音 ON" : "音 OFF"}
             </button>
 
-            <button onClick={onReset} className="rounded-lg border px-3 py-1.5 text-sm" title="リセット">
+            {/* 表示だけリセット */}
+            <button onClick={onSoftResetView} className="rounded-lg border px-3 py-1.5 text-sm" title="表示をリセット">
               ↺ リセット
             </button>
 
+            {/* 注文停止 */}
             <button
               onClick={toggleStop}
               className={`rounded-lg px-3 py-1.5 text-sm border ${
@@ -297,6 +328,15 @@ export default function AdminPage() {
               title="注文の受付を停止/再開します"
             >
               {isStopped ? "⛔ 注文STOP中" : "▶︎ 注文受付中"}
+            </button>
+
+            {/* 処理済みをサーバー側で削除する本リセット（確認あり） */}
+            <button
+              onClick={() => setConfirmOpen(true)}
+              className="rounded-lg border px-3 py-1.5 text-sm"
+              title="処理済み（完了/キャンセル）を全て削除"
+            >
+              🧹 処理済みクリア
             </button>
 
             <select
@@ -366,6 +406,34 @@ export default function AdminPage() {
           </>
         )}
       </main>
+
+      {/* 簡易モーダル（処理済みクリアの確認） */}
+      {confirmOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
+          <div className="w-[92%] max-w-md rounded-2xl bg-white p-5 shadow-xl">
+            <h3 className="text-base font-semibold mb-2">処理済みの注文を削除しますか？</h3>
+            <p className="text-sm text-gray-600 mb-4">
+              「完了」と「キャンセル」の注文をすべて削除します。未処理の注文は残ります。
+            </p>
+            <div className="flex justify-end gap-2">
+              <button
+                disabled={confirmBusy}
+                onClick={() => setConfirmOpen(false)}
+                className="rounded-lg border px-3 py-1.5 text-sm"
+              >
+                いいえ
+              </button>
+              <button
+                disabled={confirmBusy}
+                onClick={execResetProcessedOnly}
+                className="rounded-lg bg-red-600 text-white px-3 py-1.5 text-sm disabled:opacity-60"
+              >
+                {confirmBusy ? "削除中…" : "はい、削除する"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <style jsx global>{`
         @keyframes buzz {
