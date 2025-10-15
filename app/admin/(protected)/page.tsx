@@ -41,25 +41,37 @@ export default function AdminPage() {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("");
   const [error, setError] = useState<string | null>(null);
 
-  // === 通知系（音・揺れ・ハイライト） ===
+  // 通知系
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  const [soundEnabled, setSoundEnabled] = useState(false); // クリックで有効化（ブラウザの自動再生制限対策）
-  const knownPendingIds = useRef<Set<string>>(new Set());  // 直近までに存在していた pending のID
-  const initialized = useRef(false);                       // 初回同期は通知しない
-  const [buzzIds, setBuzzIds] = useState<Set<string>>(new Set()); // 揺らす対象
+  const [soundEnabled, setSoundEnabled] = useState(false);
+  const knownPendingIds = useRef<Set<string>>(new Set());
+  const initialized = useRef(false);
+  const [buzzIds, setBuzzIds] = useState<Set<string>>(new Set());
+
+  // STOPトグル
+  const [isStopped, setIsStopped] = useState(false);
+
+  const playNotify = () => {
+    if (!soundEnabled) return;
+    const a = audioRef.current;
+    if (!a) return;
+    try {
+      a.currentTime = 0; // 同じ音を続けて鳴らせるように必ず頭出し
+      const p = a.play();
+      if (p) p.catch(() => {});
+    } catch {}
+  };
 
   const triggerNotify = (newIds: string[]) => {
     // 音
-    if (soundEnabled) {
-      // 再生は失敗（ユーザー操作前など）しても無視
-      audioRef.current?.play().catch(() => {});
-    }
-    // 端末バイブ（対応端末のみ）
+    playNotify();
+
+    // 短いバイブ（120msだけ）
     if (typeof navigator !== "undefined" && "vibrate" in navigator) {
-      // 短く2発
-      (navigator as any).vibrate?.([120, 80, 120]);
+      (navigator as any).vibrate?.(120);
     }
-    // 揺れアニメーション（数秒で解除）
+
+    // カードを軽くブルっと（0.6s × 2回）
     if (newIds.length > 0) {
       setBuzzIds((prev) => new Set([...Array.from(prev), ...newIds]));
       setTimeout(() => {
@@ -68,7 +80,7 @@ export default function AdminPage() {
           newIds.forEach((id) => next.delete(id));
           return next;
         });
-      }, 6000); // 6秒で解除
+      }, 1200);
     }
   };
 
@@ -83,11 +95,9 @@ export default function AdminPage() {
         throw new Error(json.error || "一覧の取得に失敗しました");
       }
 
-      // 新規 pending の検出（「増えたID」だけ通知）
       const currentPending = json.items.filter((o) => o.status === "pending");
       const currentIdsSet = new Set(currentPending.map((o) => o.id));
 
-      // 初回はベースラインだけ作って通知しない
       if (!initialized.current) {
         knownPendingIds.current = currentIdsSet;
         initialized.current = true;
@@ -125,7 +135,6 @@ export default function AdminPage() {
       if (!res.ok || !json.ok) {
         throw new Error(json.error || "更新に失敗しました");
       }
-      // 状態の取り直し
       fetchList();
     } catch (e: unknown) {
       setOrders(prev);
@@ -139,48 +148,65 @@ export default function AdminPage() {
     router.replace("/admin/login");
   }
 
+  async function fetchStopState() {
+    try {
+      const r = await fetch("/api/admin/stop", { cache: "no-store", credentials: "include" });
+      const j = await r.json();
+      if (j?.ok) setIsStopped(!!j.stopped);
+    } catch {}
+  }
+
+  async function toggleStop() {
+    try {
+      const next = !isStopped;
+      const r = await fetch("/api/admin/stop", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ stopped: next }),
+      });
+      const j = await r.json();
+      if (j?.ok) setIsStopped(!!j.stopped);
+    } catch (e) {
+      console.error(e);
+      alert("切り替えに失敗しました");
+    }
+  }
+
   // 初回＆フィルタ変更時に取得
   useEffect(() => {
     setLoading(true);
     fetchList();
+    fetchStopState();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [statusFilter]);
 
-  // === ポーリング：前面5秒 / 背景60秒。前面復帰で即fetch ===
+  // 前面5秒 / 背景60秒
   useEffect(() => {
     let timer: ReturnType<typeof setInterval> | null = null;
-
     const schedule = (ms: number) => {
       if (timer) clearInterval(timer);
       timer = setInterval(fetchList, ms);
     };
-
-    const onVisibility = () => {
-      if (document.hidden) {
-        schedule(60_000); // 背景は60秒
-      } else {
-        fetchList();      // 前面に戻った瞬間に更新
-        schedule(5_000);  // 前面は5秒
+    const onVis = () => {
+      if (document.hidden) schedule(60_000);
+      else {
+        fetchList();
+        schedule(5_000);
       }
     };
-
-    onVisibility();
-    document.addEventListener("visibilitychange", onVisibility);
-
+    onVis();
+    document.addEventListener("visibilitychange", onVis);
     return () => {
-      document.removeEventListener("visibilitychange", onVisibility);
+      document.removeEventListener("visibilitychange", onVis);
       if (timer) clearInterval(timer);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [statusFilter]);
 
-  // === Realtime: orders テーブルの INSERT / UPDATE を即時反映 ===
+  // Realtime
   useEffect(() => {
-    if (!supabase) {
-      console.warn("Supabase Realtime disabled: env not set");
-      return;
-    }
-    // 連打抑制（1秒に1回まで）
+    if (!supabase) return;
     let last = 0;
     const trigger = () => {
       const now = Date.now();
@@ -189,15 +215,13 @@ export default function AdminPage() {
         fetchList();
       }
     };
-
-    const channel = supabase
+    const ch = supabase
       .channel("orders-realtime")
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "orders" }, trigger)
       .on("postgres_changes", { event: "UPDATE", schema: "public", table: "orders" }, trigger)
       .subscribe();
-
     return () => {
-      supabase?.removeChannel(channel);
+      supabase?.removeChannel(ch);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [statusFilter]);
@@ -207,6 +231,28 @@ export default function AdminPage() {
     const done = orders.filter((o) => o.status !== "pending");
     return { pending, done };
   }, [orders]);
+
+  const onClickSoundToggle = () => {
+    const next = !soundEnabled;
+    setSoundEnabled(next);
+    // クリック直後に一度再生→停止でアンロック（自動再生ブロック対策）
+    if (next) {
+      const a = audioRef.current;
+      if (a) {
+        a.currentTime = 0;
+        a.play().then(() => a.pause()).catch(() => {});
+      }
+    }
+  };
+
+  const onReset = () => {
+    setStatusFilter("");
+    setError(null);
+    setBuzzIds(new Set());
+    knownPendingIds.current = new Set();
+    initialized.current = false;
+    fetchList();
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -223,15 +269,32 @@ export default function AdminPage() {
           </span>
 
           <div className="ml-auto flex items-center gap-2">
-            {/* サウンド有効化トグル（初回クリックで音が鳴るようになる） */}
             <button
-              onClick={() => setSoundEnabled((v) => !v)}
+              onClick={onClickSoundToggle}
               className={`rounded-lg px-3 py-1.5 text-sm border ${
                 soundEnabled ? "bg-green-600 text-white" : "bg-white"
               }`}
               title="音のオン/オフ"
             >
               🔔 {soundEnabled ? "音 ON" : "音 OFF"}
+            </button>
+
+            <button
+              onClick={onReset}
+              className="rounded-lg border px-3 py-1.5 text-sm"
+              title="リセット"
+            >
+              ↺ リセット
+            </button>
+
+            <button
+              onClick={toggleStop}
+              className={`rounded-lg px-3 py-1.5 text-sm border ${
+                isStopped ? "bg-red-600 text-white border-red-600" : "bg-white"
+              }`}
+              title="注文の受付を停止/再開します"
+            >
+              {isStopped ? "⛔ 注文STOP中" : "▶︎ 注文受付中"}
             </button>
 
             <select
@@ -273,7 +336,6 @@ export default function AdminPage() {
           <p className="text-sm text-gray-500">読み込み中…</p>
         ) : (
           <>
-            {/* 未処理 */}
             {grouped.pending.length > 0 && (
               <>
                 <h2 className="mb-2 text-sm font-semibold text-gray-600">未処理</h2>
@@ -290,7 +352,6 @@ export default function AdminPage() {
               </>
             )}
 
-            {/* 処理済み（完了/キャンセル） */}
             {grouped.done.length > 0 && (
               <>
                 <h2 className="mb-2 text-sm font-semibold text-gray-600">処理済み</h2>
@@ -309,23 +370,17 @@ export default function AdminPage() {
         )}
       </main>
 
-      {/* 揺れアニメーション（シンプルなバイブ風） */}
+      {/* 軽い揺れ（0.6s × 2） */}
       <style jsx global>{`
         @keyframes buzz {
           0% { transform: translate3d(0, 0, 0); }
-          10% { transform: translate3d(-2px, 0, 0); }
-          20% { transform: translate3d(2px, 0, 0); }
-          30% { transform: translate3d(-2px, 0, 0); }
-          40% { transform: translate3d(2px, 0, 0); }
-          50% { transform: translate3d(-1px, 0, 0); }
-          60% { transform: translate3d(1px, 0, 0); }
-          70% { transform: translate3d(-1px, 0, 0); }
-          80% { transform: translate3d(1px, 0, 0); }
-          90% { transform: translate3d(0, 0, 0); }
+          25% { transform: translate3d(-2px, 0, 0); }
+          50% { transform: translate3d(2px, 0, 0); }
+          75% { transform: translate3d(-1px, 0, 0); }
           100%{ transform: translate3d(0, 0, 0); }
         }
         .buzz {
-          animation: buzz 0.4s linear infinite;
+          animation: buzz 0.6s linear 2;
         }
         .glow {
           box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.35);

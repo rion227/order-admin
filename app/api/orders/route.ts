@@ -1,19 +1,17 @@
 // app/api/orders/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { nanoid } from "nanoid";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
+import { randomInt } from "crypto";
 
-export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
-
-// 許可オリジン（厳格化するときに使う）
+// ===== ここはあなたのプロジェクトの方針に合わせてOK =====
+// 既存の CORS 設定があるなら差し替えて使ってください。
 const THIS_ORIGIN =
   process.env.NEXT_PUBLIC_SITE_ORIGIN || "http://localhost:3000";
 const ALLOWED = new Set<string>([
   "http://localhost:3000",
-  THIS_ORIGIN, // Render 本番
-  "https://qr-order-sigma.vercel.app", // お客様サイト
+  THIS_ORIGIN,
+  "https://qr-order-sigma.vercel.app",
 ]);
 
 function corsHeaders(req: NextRequest) {
@@ -21,9 +19,8 @@ function corsHeaders(req: NextRequest) {
   const reqHdrs =
     req.headers.get("access-control-request-headers") ??
     "content-type, idempotency-key";
-  // ★まずは確実に通すために "*"。通るのを確認後、次の1行に置き換えて厳格化してください。
+  // 厳格運用
   const allowOrigin = ALLOWED.has(origin) ? origin : "";
-
   return {
     "Access-Control-Allow-Origin": allowOrigin,
     Vary: "Origin",
@@ -33,14 +30,47 @@ function corsHeaders(req: NextRequest) {
     "Access-Control-Max-Age": "600",
   };
 }
+// ===========================================================
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
+// クライアント→APIのリクエスト体裁
+const ItemSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().min(1),
+  qty: z.number().int().positive(),
+  price: z.number().nonnegative().optional(),
+});
+const CreateSchema = z.object({
+  items: z.array(ItemSchema).min(1),
+  note: z.string().max(500).optional().nullable(),
+});
+
+// JSTの YYYYMMDD を作る
+function yyyymmddJST(): string {
+  const f = new Intl.DateTimeFormat("ja-JP", {
+    timeZone: "Asia/Tokyo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+  const parts = f.formatToParts(new Date());
+  const y = parts.find((p) => p.type === "year")?.value ?? "0000";
+  const m = parts.find((p) => p.type === "month")?.value ?? "00";
+  const d = parts.find((p) => p.type === "day")?.value ?? "00";
+  return `${y}${m}${d}`;
+}
+// ランダム4桁（0000–9999）
+function rand4(): string {
+  return String(randomInt(0, 10000)).padStart(4, "0");
+}
 
 export async function OPTIONS(req: NextRequest) {
   return new NextResponse(null, { status: 204, headers: corsHeaders(req) });
 }
 
-/* ====== GET /api/orders ======
- * ?limit=20&offset=0&status=pending
- */
+/** GET /api/orders?limit&offset&status */
 export async function GET(req: NextRequest) {
   const headers = corsHeaders(req);
   try {
@@ -56,15 +86,15 @@ export async function GET(req: NextRequest) {
 
     if (status) query = query.eq("status", status);
 
-    const { data: items, count, error } = await query
-      .range(offset, offset + limit - 1);
-
-    if (error) {
+    const { data: items, count, error } = await query.range(
+      offset,
+      offset + limit - 1
+    );
+    if (error)
       return NextResponse.json(
         { ok: false, error: error.message },
         { status: 500, headers }
       );
-    }
 
     const { count: pendingCount } = await supabaseAdmin
       .from("orders")
@@ -86,21 +116,7 @@ export async function GET(req: NextRequest) {
   }
 }
 
-/* ====== POST /api/orders ======
- * body: { items:[{id,name,qty,price?}], note? }
- * header: Idempotency-Key（任意）
- */
-const ItemSchema = z.object({
-  id: z.string().min(1),
-  name: z.string().min(1),
-  qty: z.number().int().positive(),
-  price: z.number().nonnegative().optional(),
-});
-const CreateSchema = z.object({
-  items: z.array(ItemSchema).min(1),
-  note: z.string().max(500).optional().nullable(),
-});
-
+/** POST /api/orders  →  20251015-0427 形式の order_no を採番 */
 export async function POST(req: NextRequest) {
   const headers = corsHeaders(req);
   try {
@@ -113,16 +129,9 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // かんたんな注文番号
-    const now = new Date();
-    const y = now.getFullYear();
-    const m = String(now.getMonth() + 1).padStart(2, "0");
-    const d = String(now.getDate()).padStart(2, "0");
-    const orderNo = `ORD-${y}${m}${d}-${nanoid(6)}`;
-
     const idempotencyKey = req.headers.get("idempotency-key");
 
-    // 既存キーがあればその注文を返す（簡易実装）
+    // すでに同じキーで作っていたらそれを返す（重複送信防止）
     if (idempotencyKey) {
       const { data: dup } = await supabaseAdmin
         .from("orders")
@@ -134,29 +143,44 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const payload = {
-      order_no: orderNo,
+    const base = {
       items: parsed.data.items,
       note: parsed.data.note ?? null,
       status: "pending" as const,
-      source: "web",
+      source: "web" as const,
       idempotency_key: idempotencyKey ?? null,
     };
 
-    const { data, error } = await supabaseAdmin
-      .from("orders")
-      .insert(payload)
-      .select()
-      .single();
+    // ユニーク違反(23505)時は番号取り直し
+    const MAX_RETRY = 20;
+    for (let i = 0; i < MAX_RETRY; i++) {
+      const order_no = `${yyyymmddJST()}-${rand4()}`;
+      const { data, error } = await supabaseAdmin
+        .from("orders")
+        .insert([{ ...base, order_no }])
+        .select()
+        .single();
 
-    if (error) {
-      return NextResponse.json(
-        { ok: false, error: error.message },
-        { status: 500, headers }
-      );
+      if (!error && data) {
+        return NextResponse.json(
+          { ok: true, order: data, order_no: data.order_no },
+          { status: 200, headers }
+        );
+      }
+      // Postgres unique violation
+      if ((error as any)?.code !== "23505") {
+        return NextResponse.json(
+          { ok: false, error: (error as any)?.message ?? "Insert failed" },
+          { status: 500, headers }
+        );
+      }
+      // 23505 のときだけ番号取り直し
     }
 
-    return NextResponse.json({ ok: true, order: data }, { status: 200, headers });
+    return NextResponse.json(
+      { ok: false, error: "番号が取りきれませんでした。時間をおいて再度お試しください。" },
+      { status: 503, headers }
+    );
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
     return NextResponse.json({ ok: false, error: msg }, { status: 500, headers });
