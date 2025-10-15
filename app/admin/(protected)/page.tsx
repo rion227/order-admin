@@ -33,6 +33,20 @@ if (typeof window !== "undefined" && SUPABASE_URL && SUPABASE_ANON) {
   supabase = createClient(SUPABASE_URL, SUPABASE_ANON);
 }
 
+// 安全に JSON を読む（空や非 JSON は {} を返す）
+async function safeJson<T = any>(res: Response): Promise<T | {}> {
+  try {
+    const ct = res.headers.get("content-type") || "";
+    if (!ct.includes("json")) return {};
+    // 空ボディ対策
+    const text = await res.text();
+    if (!text) return {};
+    return JSON.parse(text) as T;
+  } catch {
+    return {};
+  }
+}
+
 export default function AdminPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
@@ -56,22 +70,16 @@ export default function AdminPage() {
     const a = audioRef.current;
     if (!a) return;
     try {
-      a.currentTime = 0; // 同じ音を続けて鳴らせるように必ず頭出し
-      const p = a.play();
-      if (p) p.catch(() => {});
+      a.currentTime = 0;
+      a.play()?.catch(() => {});
     } catch {}
   };
 
   const triggerNotify = (newIds: string[]) => {
-    // 音
     playNotify();
-
-    // 短いバイブ（120msだけ）
     if (typeof navigator !== "undefined" && "vibrate" in navigator) {
       (navigator as any).vibrate?.(120);
     }
-
-    // カードを軽くブルっと（0.6s × 2回）
     if (newIds.length > 0) {
       setBuzzIds((prev) => new Set([...Array.from(prev), ...newIds]));
       setTimeout(() => {
@@ -90,12 +98,13 @@ export default function AdminPage() {
       const q = new URLSearchParams();
       if (statusFilter) q.set("status", statusFilter);
       const res = await fetch(`/api/orders?${q.toString()}`, { credentials: "include" });
-      const json: ListResp = await res.json();
-      if (!res.ok || !json.ok) {
-        throw new Error(json.error || "一覧の取得に失敗しました");
+      const json = (await safeJson<ListResp>(res)) as Partial<ListResp>;
+      if (!res.ok || json?.ok === false) {
+        throw new Error(json?.error || `一覧の取得に失敗しました（HTTP ${res.status}）`);
       }
 
-      const currentPending = json.items.filter((o) => o.status === "pending");
+      const items = json.items || [];
+      const currentPending = items.filter((o) => o.status === "pending");
       const currentIdsSet = new Set(currentPending.map((o) => o.id));
 
       if (!initialized.current) {
@@ -110,12 +119,12 @@ export default function AdminPage() {
         knownPendingIds.current = currentIdsSet;
       }
 
-      setOrders(json.items);
-      setPendingCount(json.pending_count);
+      setOrders(items);
+      setPendingCount(json.pending_count ?? currentPending.length);
       setError(null);
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
-      setError(msg);
+      setError(msg || "サーバーが不正な応答を返しました");
     } finally {
       setLoading(false);
     }
@@ -131,9 +140,9 @@ export default function AdminPage() {
         credentials: "include",
         body: JSON.stringify({ status }),
       });
-      const json = await res.json();
-      if (!res.ok || !json.ok) {
-        throw new Error(json.error || "更新に失敗しました");
+      const json = (await safeJson(res)) as any;
+      if (!res.ok || json?.ok === false) {
+        throw new Error(json?.error || `更新に失敗しました（HTTP ${res.status}）`);
       }
       fetchList();
     } catch (e: unknown) {
@@ -151,7 +160,7 @@ export default function AdminPage() {
   async function fetchStopState() {
     try {
       const r = await fetch("/api/admin/stop", { cache: "no-store", credentials: "include" });
-      const j = await r.json();
+      const j = (await safeJson(r)) as any;
       if (j?.ok) setIsStopped(!!j.stopped);
     } catch {}
   }
@@ -165,7 +174,7 @@ export default function AdminPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ stopped: next }),
       });
-      const j = await r.json();
+      const j = (await safeJson(r)) as any;
       if (j?.ok) setIsStopped(!!j.stopped);
     } catch (e) {
       console.error(e);
@@ -235,7 +244,6 @@ export default function AdminPage() {
   const onClickSoundToggle = () => {
     const next = !soundEnabled;
     setSoundEnabled(next);
-    // クリック直後に一度再生→停止でアンロック（自動再生ブロック対策）
     if (next) {
       const a = audioRef.current;
       if (a) {
@@ -256,10 +264,8 @@ export default function AdminPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* 通知音 */}
       <audio ref={audioRef} src="/notify.mp3" preload="auto" />
 
-      {/* ヘッダー */}
       <header className="sticky top-0 z-10 bg-white/80 backdrop-blur border-b">
         <div className="mx-auto max-w-5xl px-4 py-3 flex items-center gap-3">
           <h1 className="text-xl font-semibold">注文管理</h1>
@@ -279,11 +285,7 @@ export default function AdminPage() {
               🔔 {soundEnabled ? "音 ON" : "音 OFF"}
             </button>
 
-            <button
-              onClick={onReset}
-              className="rounded-lg border px-3 py-1.5 text-sm"
-              title="リセット"
-            >
+            <button onClick={onReset} className="rounded-lg border px-3 py-1.5 text-sm" title="リセット">
               ↺ リセット
             </button>
 
@@ -341,12 +343,7 @@ export default function AdminPage() {
                 <h2 className="mb-2 text-sm font-semibold text-gray-600">未処理</h2>
                 <ul className="mb-6 grid gap-3">
                   {grouped.pending.map((o) => (
-                    <OrderCard
-                      key={o.id}
-                      order={o}
-                      onUpdate={updateStatus}
-                      buzzing={buzzIds.has(o.id)}
-                    />
+                    <OrderCard key={o.id} order={o} onUpdate={updateStatus} buzzing={buzzIds.has(o.id)} />
                   ))}
                 </ul>
               </>
@@ -370,7 +367,6 @@ export default function AdminPage() {
         )}
       </main>
 
-      {/* 軽い揺れ（0.6s × 2） */}
       <style jsx global>{`
         @keyframes buzz {
           0% { transform: translate3d(0, 0, 0); }
@@ -379,12 +375,8 @@ export default function AdminPage() {
           75% { transform: translate3d(-1px, 0, 0); }
           100%{ transform: translate3d(0, 0, 0); }
         }
-        .buzz {
-          animation: buzz 0.6s linear 2;
-        }
-        .glow {
-          box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.35);
-        }
+        .buzz { animation: buzz 0.6s linear 2; }
+        .glow { box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.35); }
       `}</style>
     </div>
   );
