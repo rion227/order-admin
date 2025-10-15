@@ -1,8 +1,9 @@
-// app/admin/page.tsx
+// app/admin/(protected)/page.tsx
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { createClient, SupabaseClient } from "@supabase/supabase-js";
 
 type Order = {
   id: string;
@@ -23,6 +24,14 @@ type ListResp = {
 };
 
 type StatusFilter = "" | "pending" | "completed" | "cancelled";
+
+// ---- Supabase（ブラウザ用） ----
+let supabase: SupabaseClient | null = null;
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const SUPABASE_ANON = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+if (typeof window !== "undefined" && SUPABASE_URL && SUPABASE_ANON) {
+  supabase = createClient(SUPABASE_URL, SUPABASE_ANON);
+}
 
 export default function AdminPage() {
   const router = useRouter();
@@ -54,7 +63,6 @@ export default function AdminPage() {
   }
 
   async function updateStatus(id: string, status: Order["status"]) {
-    // 楽観的更新：先にUIだけ反映
     const prev = orders;
     setOrders((cur) => cur.map((o) => (o.id === id ? { ...o, status } : o)));
     try {
@@ -68,10 +76,9 @@ export default function AdminPage() {
       if (!res.ok || !json.ok) {
         throw new Error(json.error || "更新に失敗しました");
       }
-      // 未処理件数の取り直し
+      // 状態の取り直し
       fetchList();
     } catch (e: unknown) {
-      // 失敗したら元に戻す
       setOrders(prev);
       const msg = e instanceof Error ? e.message : String(e);
       alert(msg || "更新に失敗しました");
@@ -90,15 +97,71 @@ export default function AdminPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [statusFilter]);
 
-  // 5秒ごとに自動更新（最新の件数/一覧を軽く取る）
+  // === ポーリング：前面5秒 / 背景60秒。前面復帰で即fetch ===
   useEffect(() => {
-    const t = setInterval(fetchList, 5000);
-    return () => clearInterval(t);
+    let timer: ReturnType<typeof setInterval> | null = null;
+
+    const schedule = (ms: number) => {
+      if (timer) clearInterval(timer);
+      timer = setInterval(fetchList, ms);
+    };
+
+    const onVisibility = () => {
+      if (document.hidden) {
+        schedule(60_000); // 背景は60秒
+      } else {
+        fetchList();      // 前面に戻った瞬間に更新
+        schedule(5_000);  // 前面は5秒
+      }
+    };
+
+    onVisibility();
+    document.addEventListener("visibilitychange", onVisibility);
+
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibility);
+      if (timer) clearInterval(timer);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [statusFilter]);
+
+  // === Realtime: orders テーブルの INSERT / UPDATE を即時反映 ===
+  useEffect(() => {
+    if (!supabase) {
+      console.warn("Supabase Realtime disabled: env not set");
+      return;
+    }
+    // 連打抑制（1秒に1回まで）
+    let last = 0;
+    const trigger = () => {
+      const now = Date.now();
+      if (now - last > 1000) {
+        last = now;
+        fetchList();
+      }
+    };
+
+    const channel = supabase
+      .channel("orders-realtime")
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "orders" },
+        trigger
+      )
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "orders" },
+        trigger
+      )
+      .subscribe();
+
+    return () => {
+      supabase?.removeChannel(channel);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [statusFilter]);
 
   const grouped = useMemo(() => {
-    // 未処理を上、その他を下に
     const pending = orders.filter((o) => o.status === "pending");
     const done = orders.filter((o) => o.status !== "pending");
     return { pending, done };
@@ -136,7 +199,6 @@ export default function AdminPage() {
               更新
             </button>
 
-            {/* ログアウトボタン */}
             <button
               onClick={logout}
               className="rounded-lg bg-gray-900 text-white px-3 py-1.5 text-sm"
@@ -159,7 +221,6 @@ export default function AdminPage() {
           <p className="text-sm text-gray-500">読み込み中…</p>
         ) : (
           <>
-            {/* 未処理 */}
             {grouped.pending.length > 0 && (
               <>
                 <h2 className="mb-2 text-sm font-semibold text-gray-600">未処理</h2>
@@ -171,7 +232,6 @@ export default function AdminPage() {
               </>
             )}
 
-            {/* 処理済み（完了/キャンセル） */}
             {grouped.done.length > 0 && (
               <>
                 <h2 className="mb-2 text-sm font-semibold text-gray-600">処理済み</h2>

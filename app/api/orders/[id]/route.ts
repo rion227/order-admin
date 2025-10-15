@@ -7,7 +7,11 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const THIS_ORIGIN = process.env.NEXT_PUBLIC_SITE_ORIGIN || "http://localhost:3000";
-const ALLOWED_ORIGINS = new Set(["http://localhost:3000", THIS_ORIGIN]);
+const ALLOWED_ORIGINS = new Set([
+  "http://localhost:3000",
+  THIS_ORIGIN,                       // ← Renderの本番URL
+  "https://qr-order-sigma.vercel.app" // ← お客様サイト（送信元）
+]);
 
 function corsHeaders(origin: string | null) {
   const allow = origin && ALLOWED_ORIGINS.has(origin) ? origin : "";
