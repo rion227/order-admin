@@ -281,16 +281,6 @@ export default function AdminPage() {
     }
   };
 
-  // 画面だけの簡易リセット（フィルタやエラー、既知IDなど）
-  const onSoftResetView = () => {
-    setStatusFilter("");
-    setError(null);
-    setBuzzIds(new Set());
-    knownPendingIds.current = new Set();
-    initialized.current = false;
-    fetchList();
-  };
-
   return (
     <div className="min-h-screen bg-gray-50">
       <audio ref={audioRef} src="/notify.mp3" preload="auto" />
@@ -314,11 +304,6 @@ export default function AdminPage() {
               🔔 {soundEnabled ? "音 ON" : "音 OFF"}
             </button>
 
-            {/* 表示だけリセット */}
-            <button onClick={onSoftResetView} className="rounded-lg border px-3 py-1.5 text-sm" title="表示をリセット">
-              ↺ リセット
-            </button>
-
             {/* 注文停止 */}
             <button
               onClick={toggleStop}
@@ -336,7 +321,7 @@ export default function AdminPage() {
               className="rounded-lg border px-3 py-1.5 text-sm"
               title="処理済み（完了/キャンセル）を全て削除"
             >
-              🧹 処理済みクリア
+              処理済みクリア
             </button>
 
             <select
