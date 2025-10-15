@@ -22,8 +22,7 @@ function corsHeaders(req: NextRequest) {
     req.headers.get("access-control-request-headers") ??
     "content-type, idempotency-key";
   // ★まずは確実に通すために "*"。通るのを確認後、次の1行に置き換えて厳格化してください。
-  const allowOrigin = "*";
-  // const allowOrigin = ALLOWED.has(origin) ? origin : "";
+  const allowOrigin = ALLOWED.has(origin) ? origin : "";
 
   return {
     "Access-Control-Allow-Origin": allowOrigin,

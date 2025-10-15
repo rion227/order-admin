@@ -20,8 +20,7 @@ function corsHeaders(req: NextRequest) {
   const reqHdrs =
     req.headers.get("access-control-request-headers") ?? "content-type";
   // ★まずは "*" で確実に通す。通るのを確認後に下行へ変更し厳格化。
-  const allowOrigin = "*";
-  // const allowOrigin = ALLOWED.has(origin) ? origin : "";
+  const allowOrigin = ALLOWED.has(origin) ? origin : "";
 
   return {
     "Access-Control-Allow-Origin": allowOrigin,
