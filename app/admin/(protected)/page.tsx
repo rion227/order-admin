@@ -286,72 +286,142 @@ export default function AdminPage() {
       {/* 通常通知音（新規入荷時のピロン）。音ON時のみ鳴動 */}
       <audio ref={audioRef} src="/notify.mp3" preload="auto" />
 
-      <header className="sticky top-0 z-10 bg-white/80 backdrop-blur border-b">
-        <div className="mx-auto max-w-5xl px-4 py-3 flex items-center gap-3">
-          <h1 className="text-xl font-semibold">注文管理</h1>
+      <header className="sticky top-0 z-10 border-b bg-white md:bg-white/80 md:backdrop-blur">
+  <div className="mx-auto max-w-5xl px-3 py-2">
+    {/* タイトル行（共通） */}
+    <div className="flex items-center gap-3">
+      <h1 className="text-lg md:text-xl font-semibold text-gray-900">注文管理</h1>
 
-          <span className="ml-2 inline-flex items-center rounded-full border px-2.5 py-0.5 text-sm">
-            未処理 <span className="ml-1 font-bold">{pendingCount}</span>
-          </span>
+      <span className="ml-2 inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs md:text-sm bg-white">
+        未処理 <span className="ml-1 font-bold">{pendingCount}</span>
+      </span>
 
-          <div className="ml-auto flex items-center gap-2">
-            <button
-              onClick={onClickSoundToggle}
-              className={`rounded-lg px-3 py-1.5 text-sm border ${
-                soundEnabled ? "bg-green-600 text-white" : "bg-white"
-              }`}
-              title="音のオン/オフ"
-            >
-              🔔 {soundEnabled ? "音 ON" : "音 OFF"}
-            </button>
+      {/* PC: 右寄せのコントロール（従来のUIをそのまま） */}
+      <div className="ml-auto hidden md:flex items-center gap-2">
+        <button
+          onClick={onClickSoundToggle}
+          className={`rounded-lg px-3 py-1.5 text-sm border ${
+            soundEnabled ? "bg-green-600 text-white" : "bg-white"
+          }`}
+          title="音のオン/オフ"
+        >
+          🔔 {soundEnabled ? "音 ON" : "音 OFF"}
+        </button>
 
-            {/* 注文停止 */}
-            <button
-              onClick={toggleStop}
-              className={`rounded-lg px-3 py-1.5 text-sm border ${
-                isStopped ? "bg-red-600 text-white border-red-600" : "bg-white"
-              }`}
-              title="注文の受付を停止/再開します"
-            >
-              {isStopped ? "⛔ 注文STOP中" : "▶︎ 注文受付中"}
-            </button>
+        {/* 注文停止 */}
+        <button
+          onClick={toggleStop}
+          className={`rounded-lg px-3 py-1.5 text-sm border ${
+            isStopped ? "bg-red-600 text-white border-red-600" : "bg-white"
+          }`}
+          title="注文の受付を停止/再開します"
+        >
+          {isStopped ? "⛔ 注文STOP中" : "▶︎ 注文受付中"}
+        </button>
 
-            {/* 処理済みをサーバー側で削除する本リセット（確認あり） */}
-            <button
-              onClick={() => setConfirmOpen(true)}
-              className="rounded-lg border px-3 py-1.5 text-sm"
-              title="処理済み（完了/キャンセル）を全て削除"
-            >
-              処理済みクリア
-            </button>
+        {/* 処理済みクリア */}
+        <button
+          onClick={() => setConfirmOpen(true)}
+          className="rounded-lg border px-3 py-1.5 text-sm"
+          title="処理済み（完了/キャンセル）を全て削除"
+        >
+          処理済みクリア
+        </button>
 
-            <select
-              className="rounded-lg border px-3 py-1.5 text-sm"
-              value={statusFilter}
-              onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
-                setStatusFilter(e.target.value as StatusFilter)
-              }
-            >
-              <option value="">すべて</option>
-              <option value="pending">未処理のみ</option>
-              <option value="completed">完了のみ</option>
-              <option value="cancelled">キャンセルのみ</option>
-            </select>
+        {/* フィルタ */}
+        <select
+          className="rounded-lg border px-3 py-1.5 text-sm bg-white"
+          value={statusFilter}
+          onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
+            setStatusFilter(e.target.value as StatusFilter)
+          }
+        >
+          <option value="">すべて</option>
+          <option value="pending">未処理のみ</option>
+          <option value="completed">完了のみ</option>
+          <option value="cancelled">キャンセルのみ</option>
+        </select>
 
-            <button onClick={fetchList} className="rounded-lg border px-3 py-1.5 text-sm" title="更新">
-              更新
-            </button>
+        <button onClick={fetchList} className="rounded-lg border px-3 py-1.5 text-sm" title="更新">
+          更新
+        </button>
 
-            <button
-              onClick={logout}
-              className="rounded-lg bg-gray-900 text-white px-3 py-1.5 text-sm"
-              title="ログアウト"
-            >
-              ログアウト
-            </button>
-          </div>
-        </div>
-      </header>
+        <button
+          onClick={logout}
+          className="rounded-lg bg-gray-900 text-white px-3 py-1.5 text-sm"
+          title="ログアウト"
+        >
+          ログアウト
+        </button>
+      </div>
+    </div>
+
+    {/* スマホ（md未満）: 2段レイアウト */}
+    {/* 1段目: 音 / 注文受付 / 処理済みクリア */}
+    <div className="mt-2 grid grid-cols-3 gap-2 md:hidden">
+      <button
+        onClick={onClickSoundToggle}
+        className={`w-full rounded-lg px-3 py-2 text-sm border ${
+          soundEnabled ? "bg-green-600 text-white" : "bg-white"
+        }`}
+        title="音のオン/オフ"
+      >
+        🔔 音{soundEnabled ? " ON" : " OFF"}
+      </button>
+
+      <button
+        onClick={toggleStop}
+        className={`w-full rounded-lg px-3 py-2 text-sm border ${
+          isStopped ? "bg-red-600 text-white border-red-600" : "bg-white"
+        }`}
+        title="注文の受付を停止/再開します"
+      >
+        {isStopped ? "⛔ 注文停止" : "▶︎ 注文受付"}
+      </button>
+
+      <button
+        onClick={() => setConfirmOpen(true)}
+        className="w-full rounded-lg border px-3 py-2 text-sm bg-white"
+        title="処理済み（完了/キャンセル）を全て削除"
+      >
+        処理済みクリア
+      </button>
+    </div>
+
+    {/* 2段目: すべて(フィルタ) / 更新 / ログアウト */}
+    <div className="mt-2 grid grid-cols-3 gap-2 md:hidden">
+      <select
+        className="w-full rounded-lg border px-3 py-2 text-sm bg-white"
+        value={statusFilter}
+        onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
+          setStatusFilter(e.target.value as StatusFilter)
+        }
+      >
+        <option value="">すべて</option>
+        <option value="pending">未処理のみ</option>
+        <option value="completed">完了のみ</option>
+        <option value="cancelled">キャンセルのみ</option>
+      </select>
+
+      <button
+        onClick={fetchList}
+        className="w-full rounded-lg border px-3 py-2 text-sm bg-white"
+        title="更新"
+      >
+        更新
+      </button>
+
+      <button
+        onClick={logout}
+        className="w-full rounded-lg bg-gray-900 text-white px-3 py-2 text-sm"
+        title="ログアウト"
+      >
+        ログアウト
+      </button>
+    </div>
+  </div>
+</header>
+
 
       <main className="mx-auto max-w-5xl px-4 py-6" aria-live="polite">
         {error && (
