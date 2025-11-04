@@ -286,144 +286,142 @@ export default function AdminPage() {
       {/* 通常通知音（新規入荷時のピロン）。音ON時のみ鳴動 */}
       <audio ref={audioRef} src="/notify.mp3" preload="auto" />
 
+      {/* ===== ヘッダー：PCは横一列、スマホは2段 ===== */}
       <header className="sticky top-0 z-10 border-b bg-white md:bg-white/80 md:backdrop-blur">
-  <div className="mx-auto max-w-5xl px-3 py-2">
-    {/* タイトル行（共通） */}
-    <div className="flex items-center gap-3">
-      <h1 className="text-lg md:text-xl font-semibold text-gray-900">注文管理</h1>
+        <div className="mx-auto max-w-5xl px-3 py-2">
+          {/* タイトル行（共通） */}
+          <div className="flex items-center gap-3">
+            <h1 className="text-lg md:text-xl font-semibold text-gray-900">注文管理</h1>
 
-      <span className="ml-2 inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs md:text-sm bg-white">
-        未処理 <span className="ml-1 font-bold">{pendingCount}</span>
-      </span>
+            <span className="ml-2 inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs md:text-sm bg-white">
+              未処理 <span className="ml-1 font-bold">{pendingCount}</span>
+            </span>
 
-      {/* PC: 右寄せのコントロール（従来のUIをそのまま） */}
-      <div className="ml-auto hidden md:flex items-center gap-2">
-        <button
-          onClick={onClickSoundToggle}
-          className={`rounded-lg px-3 py-1.5 text-sm border ${
-            soundEnabled ? "bg-green-600 text-white" : "bg-white"
-          }`}
-          title="音のオン/オフ"
-        >
-          🔔 {soundEnabled ? "音 ON" : "音 OFF"}
-        </button>
+            {/* PC: 右寄せのコントロール（従来のUI） */}
+            <div className="ml-auto hidden md:flex items-center gap-2">
+              <button
+                onClick={onClickSoundToggle}
+                className={`rounded-lg px-3 py-1.5 text-sm border ${
+                  soundEnabled ? "bg-green-600 text-white" : "bg-white"
+                }`}
+                title="音のオン/オフ"
+              >
+                🔔 {soundEnabled ? "音 ON" : "音 OFF"}
+              </button>
 
-        {/* 注文停止 */}
-        <button
-          onClick={toggleStop}
-          className={`rounded-lg px-3 py-1.5 text-sm border ${
-            isStopped ? "bg-red-600 text-white border-red-600" : "bg-white"
-          }`}
-          title="注文の受付を停止/再開します"
-        >
-          {isStopped ? "⛔ 注文STOP中" : "▶︎ 注文受付中"}
-        </button>
+              {/* 注文停止 */}
+              <button
+                onClick={toggleStop}
+                className={`rounded-lg px-3 py-1.5 text-sm border ${
+                  isStopped ? "bg-red-600 text-white border-red-600" : "bg-white"
+                }`}
+                title="注文の受付を停止/再開します"
+              >
+                {isStopped ? "⛔ 注文STOP中" : "▶︎ 注文受付中"}
+              </button>
 
-        {/* 処理済みクリア */}
-        <button
-          onClick={() => setConfirmOpen(true)}
-          className="rounded-lg border px-3 py-1.5 text-sm"
-          title="処理済み（完了/キャンセル）を全て削除"
-        >
-          処理済みクリア
-        </button>
+              {/* 処理済みクリア */}
+              <button
+                onClick={() => setConfirmOpen(true)}
+                className="rounded-lg border px-3 py-1.5 text-sm"
+                title="処理済み（完了/キャンセル）を全て削除"
+              >
+                処理済みクリア
+              </button>
 
-        {/* フィルタ */}
-        <select
-          className="rounded-lg border px-3 py-1.5 text-sm bg-white"
-          value={statusFilter}
-          onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
-            setStatusFilter(e.target.value as StatusFilter)
-          }
-        >
-          <option value="">すべて</option>
-          <option value="pending">未処理のみ</option>
-          <option value="completed">完了のみ</option>
-          <option value="cancelled">キャンセルのみ</option>
-        </select>
+              {/* フィルタ */}
+              <select
+                className="rounded-lg border px-3 py-1.5 text-sm bg-white"
+                value={statusFilter}
+                onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
+                  setStatusFilter(e.target.value as StatusFilter)
+                }
+              >
+                <option value="">すべて</option>
+                <option value="pending">未処理のみ</option>
+                <option value="completed">完了のみ</option>
+                <option value="cancelled">キャンセルのみ</option>
+              </select>
 
-        <button onClick={fetchList} className="rounded-lg border px-3 py-1.5 text-sm" title="更新">
-          更新
-        </button>
+              <button onClick={fetchList} className="rounded-lg border px-3 py-1.5 text-sm" title="更新">
+                更新
+              </button>
 
-        <button
-          onClick={logout}
-          className="rounded-lg bg-gray-900 text-white px-3 py-1.5 text-sm"
-          title="ログアウト"
-        >
-          ログアウト
-        </button>
-      </div>
-    </div>
+              <button
+                onClick={logout}
+                className="rounded-lg bg-gray-900 text-white px-3 py-1.5 text-sm"
+                title="ログアウト"
+              >
+                ログアウト
+              </button>
+            </div>
+          </div>
 
-    {/* スマホ（md未満）: 2段レイアウト */}
- {/* 1段目: 音 / 注文受付 / 処理済みクリア */}
-<div className="mt-2 grid grid-cols-3 gap-2 md:hidden">
-  <button
-    onClick={onClickSoundToggle}
-    className={`min-w-0 w-full rounded-lg px-2 py-2 text-[12px] leading-5 font-medium border whitespace-nowrap ${
-      soundEnabled ? "bg-green-600 text-white" : "bg-white text-gray-900"
-    }`}
-    title="音のオン/オフ"
-  >
-    🔔 音{soundEnabled ? " ON" : " OFF"}
-  </button>
+          {/* スマホ（md未満）: 2段レイアウト */}
+          {/* 1段目: 音 / 注文受付 / 処理済みクリア */}
+          <div className="mt-2 grid grid-cols-3 gap-2 md:hidden">
+            <button
+              onClick={onClickSoundToggle}
+              className={`min-w-0 w-full rounded-lg px-2 py-2 text-[12px] leading-5 font-medium border whitespace-nowrap ${
+                soundEnabled ? "bg-green-600 text-white" : "bg-white text-gray-900"
+              }`}
+              title="音のオン/オフ"
+            >
+              🔔 音{soundEnabled ? " ON" : " OFF"}
+            </button>
 
-  <button
-    onClick={toggleStop}
-    className={`min-w-0 w-full rounded-lg px-2 py-2 text-[12px] leading-5 font-medium border whitespace-nowrap ${
-      isStopped ? "bg-red-600 text-white border-red-600" : "bg-white text-gray-900"
-    }`}
-    title="注文の受付を停止/再開します"
-  >
-    {isStopped ? "⛔ 停止中" : "▶︎ 注文受付"}
-  </button>
+            <button
+              onClick={toggleStop}
+              className={`min-w-0 w-full rounded-lg px-2 py-2 text-[12px] leading-5 font-medium border whitespace-nowrap ${
+                isStopped ? "bg-red-600 text-white border-red-600" : "bg-white text-gray-900"
+              }`}
+              title="注文の受付を停止/再開します"
+            >
+              {isStopped ? "⛔ 停止中" : "▶︎ 注文受付"}
+            </button>
 
-  <button
-    onClick={() => setConfirmOpen(true)}
-    className="min-w-0 w-full rounded-lg border px-2 py-2 text-[12px] leading-5 font-medium bg-white text-gray-900 whitespace-nowrap"
-    title="処理済み（完了/キャンセル）を全て削除"
-  >
-    処理済みクリア
-  </button>
-</div>
+            <button
+              onClick={() => setConfirmOpen(true)}
+              className="min-w-0 w-full rounded-lg border px-2 py-2 text-[12px] leading-5 font-medium bg-white text-gray-900 whitespace-nowrap"
+              title="処理済み（完了/キャンセル）を全て削除"
+            >
+              処理済みクリア
+            </button>
+          </div>
 
+          {/* 2段目: すべて(フィルタ) / 更新 / ログアウト */}
+          <div className="mt-2 grid grid-cols-3 gap-2 md:hidden">
+            <select
+              className="min-w-0 w-full rounded-lg border px-2 pr-8 py-2 text-[12px] leading-5 font-medium bg-white text-gray-900 whitespace-nowrap"
+              value={statusFilter}
+              onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
+                setStatusFilter(e.target.value as StatusFilter)
+              }
+            >
+              <option value="">すべて</option>
+              <option value="pending">未処理のみ</option>
+              <option value="completed">完了のみ</option>
+              <option value="cancelled">キャンセルのみ</option>
+            </select>
 
-    {/* 2段目: すべて(フィルタ) / 更新 / ログアウト */}
-<div className="mt-2 grid grid-cols-3 gap-2 md:hidden">
-  <select
-    className="min-w-0 w-full rounded-lg border px-2 pr-8 py-2 text-[12px] leading-5 font-medium bg-white text-gray-900 whitespace-nowrap"
-    value={statusFilter}
-    onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
-      setStatusFilter(e.target.value as StatusFilter)
-    }
-  >
-    <option value="">すべて</option>
-    <option value="pending">未処理のみ</option>
-    <option value="completed">完了のみ</option>
-    <option value="cancelled">キャンセルのみ</option>
-  </select>
+            <button
+              onClick={fetchList}
+              className="min-w-0 w-full rounded-lg border px-2 py-2 text-[12px] leading-5 font-medium bg-white text-gray-900 whitespace-nowrap"
+              title="更新"
+            >
+              更新
+            </button>
 
-  <button
-    onClick={fetchList}
-    className="min-w-0 w-full rounded-lg border px-2 py-2 text-[12px] leading-5 font-medium bg-white text-gray-900 whitespace-nowrap"
-    title="更新"
-  >
-    更新
-  </button>
-
-  <button
-    onClick={logout}
-    className="min-w-0 w-full rounded-lg bg-gray-900 text-white px-2 py-2 text-[12px] leading-5 font-medium whitespace-nowrap"
-    title="ログアウト"
-  >
-    ログアウト
-  </button>
-</div>
-
-  </div>
-</header>
-
+            <button
+              onClick={logout}
+              className="min-w-0 w-full rounded-lg bg-gray-900 text-white px-2 py-2 text-[12px] leading-5 font-medium whitespace-nowrap"
+              title="ログアウト"
+            >
+              ログアウト
+            </button>
+          </div>
+        </div>
+      </header>
 
       <main className="mx-auto max-w-5xl px-4 py-6" aria-live="polite">
         {error && (
@@ -438,7 +436,8 @@ export default function AdminPage() {
           <>
             {grouped.pending.length > 0 && (
               <>
-                <h2 className="mb-2 text-sm font-semibold text-gray-600">未処理</h2>
+                {/* 見出しを濃く＆モバイルは少し大きく */}
+                <h2 className="mb-2 text-base md:text-sm font-semibold text-gray-900">未処理</h2>
                 <ul className="mb-6 grid gap-3">
                   {grouped.pending.map((o) => (
                     <OrderCard key={o.id} order={o} onUpdate={updateStatus} buzzing={buzzIds.has(o.id)} />
@@ -449,7 +448,7 @@ export default function AdminPage() {
 
             {grouped.done.length > 0 && (
               <>
-                <h2 className="mb-2 text-sm font-semibold text-gray-600">処理済み</h2>
+                <h2 className="mb-2 text-base md:text-sm font-semibold text-gray-900">処理済み</h2>
                 <ul className="grid gap-3">
                   {grouped.done.map((o) => (
                     <OrderCard key={o.id} order={o} onUpdate={updateStatus} buzzing={false} />
@@ -465,26 +464,36 @@ export default function AdminPage() {
         )}
       </main>
 
-      {/* ここから：簡易モーダル（処理済みクリアの確認）を復活 */}
+      {/* 確認モーダル：スマホで切れない＆濃いめ */}
       {confirmOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
-          <div className="w-[92%] max-w-md rounded-2xl bg-white p-5 shadow-xl">
-            <h3 className="text-base font-semibold mb-2">処理済みの注文を削除しますか？</h3>
-            <p className="text-sm text-gray-600 mb-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="confirm-title"
+            className="w-full max-w-sm md:max-w-md rounded-2xl bg-white p-4 md:p-5 shadow-2xl"
+          >
+            <h3 id="confirm-title" className="text-base md:text-lg font-semibold text-gray-900 mb-2">
+              処理済みの注文を削除しますか？
+            </h3>
+
+            <p className="text-sm md:text-[15px] text-gray-700 mb-4 leading-6 break-words">
               「完了」と「キャンセル」の注文をすべて削除します。未処理の注文は残ります。
             </p>
-            <div className="flex justify-end gap-2">
+
+            <div className="grid grid-cols-2 gap-2">
               <button
                 disabled={confirmBusy}
                 onClick={() => setConfirmOpen(false)}
-                className="rounded-lg border px-3 py-1.5 text-sm"
+                className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm md:text-base text-gray-700 disabled:opacity-60"
               >
                 いいえ
               </button>
+
               <button
                 disabled={confirmBusy}
                 onClick={execResetProcessedOnly}
-                className="rounded-lg bg-red-600 text-white px-3 py-1.5 text-sm disabled:opacity-60"
+                className="rounded-lg bg-red-600 text-white px-3 py-2 text-sm md:text-base font-medium disabled:opacity-60"
               >
                 {confirmBusy ? "削除中…" : "はい、削除する"}
               </button>
@@ -492,7 +501,6 @@ export default function AdminPage() {
           </div>
         </div>
       )}
-      {/* ここまで：モーダル */}
     </div>
   );
 }
@@ -521,7 +529,6 @@ function OrderCard({
   const kfAudioRef = useRef<HTMLAudioElement | null>(null);
   const redNotifiedRef = useRef(false);
 
-  // 赤になった瞬間に再生、完了/キャンセルになったら停止
   useEffect(() => {
     const audio = kfAudioRef.current;
     if (!audio) return;
@@ -550,11 +557,9 @@ function OrderCard({
   let blinkClass = "";
   if (order.status === "pending") {
     if (elapsed >= 180) {
-      // ベースは薄い赤のまま、背景色だけを2色で点滅
       highlightClass = "bg-red-50 border-red-300 ring-2 ring-red-400";
       blinkClass = "blink-red-bg";
     } else if (elapsed >= 120) {
-      // ユーザーの好みに合わせて：枠=黄色 / 背景=薄い黄色
       highlightClass = "bg-yellow-50 border-yellow-300";
     }
   }
@@ -573,7 +578,7 @@ function OrderCard({
         <span
           className={`ml-2 inline-flex items-center rounded-full px-2 py-0.5 text-xs border ${
             order.status === "pending"
-              ? "bg-yellow-50 border-yellow-200 text-yellow-700"
+              ? "bg-yellow-100 border-yellow-300 text-yellow-800"
               : order.status === "completed"
               ? "bg-green-50 border-green-200 text-green-700"
               : "bg-red-50 border-red-200 text-red-700"
