@@ -393,18 +393,34 @@ export default function AdminPage() {
         )}
       </main>
 
-      {/* ページ内に残しておく（buzz/glow）。点滅はglobals.cssへ */}
-      <style jsx global>{`
-        @keyframes buzz {
-          0% { transform: translate3d(0, 0, 0); }
-          25% { transform: translate3d(-2px, 0, 0); }
-          50% { transform: translate3d(2px, 0, 0); }
-          75% { transform: translate3d(-1px, 0, 0); }
-          100%{ transform: translate3d(0, 0, 0); }
-        }
-        .buzz { animation: buzz 0.6s linear 2; }
-        .glow { box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.35); }
-      `}</style>
+      {/* ここから：簡易モーダル（処理済みクリアの確認）を復活 */}
+      {confirmOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
+          <div className="w-[92%] max-w-md rounded-2xl bg-white p-5 shadow-xl">
+            <h3 className="text-base font-semibold mb-2">処理済みの注文を削除しますか？</h3>
+            <p className="text-sm text-gray-600 mb-4">
+              「完了」と「キャンセル」の注文をすべて削除します。未処理の注文は残ります。
+            </p>
+            <div className="flex justify-end gap-2">
+              <button
+                disabled={confirmBusy}
+                onClick={() => setConfirmOpen(false)}
+                className="rounded-lg border px-3 py-1.5 text-sm"
+              >
+                いいえ
+              </button>
+              <button
+                disabled={confirmBusy}
+                onClick={execResetProcessedOnly}
+                className="rounded-lg bg-red-600 text-white px-3 py-1.5 text-sm disabled:opacity-60"
+              >
+                {confirmBusy ? "削除中…" : "はい、削除する"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* ここまで：モーダル */}
     </div>
   );
 }
@@ -443,8 +459,7 @@ function OrderCard({
         redNotifiedRef.current = true;
         try {
           audio.currentTime = 0;
-          // ループは属性で設定済み。強制再生（自動再生ポリシーの影響を受ける場合あり）
-          audio.play()?.catch(() => {});
+          audio.play()?.catch(() => {}); // ループは属性で指定済み
         } catch {}
       }
     } else {
@@ -453,7 +468,7 @@ function OrderCard({
         try { audio.pause(); } catch {}
       }
       if (order.status !== "pending") {
-        redNotifiedRef.current = false; // 完了/キャンセル後に再度pendingで戻るケースに備えてリセット
+        redNotifiedRef.current = false; // 再入場に備える
       }
     }
   }, [elapsed, order.status]);
@@ -463,9 +478,11 @@ function OrderCard({
   let blinkClass = "";
   if (order.status === "pending") {
     if (elapsed >= 180) {
+      // ベースは薄い赤のまま、背景色だけを2色で点滅
       highlightClass = "bg-red-50 border-red-300 ring-2 ring-red-400";
-      blinkClass = "blink-red";
+      blinkClass = "blink-red-bg";
     } else if (elapsed >= 120) {
+      // ユーザーの好みに合わせて：枠=黄色 / 背景=薄い黄色
       highlightClass = "bg-yellow-50 border-yellow-300";
     }
   }

@@ -25,9 +25,18 @@ body {
   font-family: Arial, Helvetica, sans-serif;
 }
 
-/* ========= ここから追加（点滅 & バイブ演出用） ========= */
+/* ===== 追加：アニメーション ===== */
 
-/* 既存のカード揺れアニメ用（必要ならここに移してもOK）
+/* 赤カード用：背景色を薄赤↔少し濃い赤で点滅（不透明度は変えない） */
+@keyframes blink-red-bg {
+  0%, 49%   { background-color: #fee2e2; } /* red-100 相当 */
+  50%, 100% { background-color: #fecaca; } /* red-200 相当 */
+}
+.blink-red-bg {
+  animation: blink-red-bg 1s step-start infinite;
+}
+
+/* 既存（ページ内にもある） */
 @keyframes buzz {
   0% { transform: translate3d(0,0,0); }
   25% { transform: translate3d(-2px,0,0); }
@@ -37,13 +46,3 @@ body {
 }
 .buzz { animation: buzz 0.6s linear 2; }
 .glow { box-shadow: 0 0 0 3px rgba(59,130,246,0.35); }
-*/
-
-/* 赤カード用の点滅アニメ */
-@keyframes blink {
-  0%, 49% { opacity: 1; }
-  50%, 100% { opacity: 0.45; }
-}
-.blink-red {
-  animation: blink 1s step-start infinite;
-}
