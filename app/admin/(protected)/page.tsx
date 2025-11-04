@@ -354,18 +354,27 @@ export default function AdminPage() {
               </button>
 
               {/* ステータスフィルタ */}
-              <select
-                className="rounded-lg border px-3 py-1.5 text-sm bg-white"
-                value={statusFilter}
-                onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
-                  setStatusFilter(e.target.value as StatusFilter)
-                }
-              >
-                <option value="">すべて</option>
-                <option value="pending">未処理のみ</option>
-                <option value="completed">完了のみ</option>
-                <option value="cancelled">キャンセルのみ</option>
-              </select>
+              <div className="relative">
+                <select
+                  className="rounded-lg border pl-3 pr-9 py-1.5 text-sm bg-white appearance-none"
+                  value={statusFilter}
+                  onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
+                    setStatusFilter(e.target.value as StatusFilter)
+                  }
+                >
+                  <option value="">すべて</option>
+                  <option value="pending">未処理のみ</option>
+                  <option value="completed">完了のみ</option>
+                  <option value="cancelled">キャンセルのみ</option>
+                </select>
+                {/* ▼ 矢印（SVG）。クリックはselectに届くように pointer-events-none */}
+                <span className="pointer-events-none absolute inset-y-0 right-2 flex items-center text-gray-700">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 10.94l3.71-3.71a.75.75 0 011.08 1.04l-4.25 4.25a.75.75 0 01-1.06 0L5.21 8.27a.75.75 0 01.02-1.06z" clipRule="evenodd" />
+                  </svg>
+                </span>
+              </div>
+
 
               <button onClick={fetchList} className="rounded-lg border px-3 py-1.5 text-sm" title="更新">
                 更新
@@ -415,18 +424,26 @@ export default function AdminPage() {
 
           {/* 2段目：すべて / 更新 / ログアウト */}
           <div className="mt-2 grid grid-cols-3 gap-2 md:hidden">
-            <select
-              className="min-w-0 w-full rounded-lg border px-2 pr-8 py-2 text-[clamp(11px,3.2vw,13px)] leading-5 font-medium bg-white text-gray-900 whitespace-nowrap"
-              value={statusFilter}
-              onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
-                setStatusFilter(e.target.value as StatusFilter)
-              }
-            >
-              <option value="">すべて</option>
-              <option value="pending">未処理のみ</option>
-              <option value="completed">完了のみ</option>
-              <option value="cancelled">キャンセルのみ</option>
-            </select>
+            <div className="relative">
+              <select
+                className="min-w-0 w-full rounded-lg border pl-2 pr-9 py-2 text-[clamp(11px,3.2vw,13px)] leading-5 font-medium bg-white text-gray-900 whitespace-nowrap appearance-none"
+                value={statusFilter}
+                onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
+                  setStatusFilter(e.target.value as StatusFilter)
+                }
+              >
+                <option value="">すべて</option>
+                <option value="pending">未処理のみ</option>
+                <option value="completed">完了のみ</option>
+                <option value="cancelled">キャンセルのみ</option>
+              </select>
+              <span className="pointer-events-none absolute inset-y-0 right-2 flex items-center text-gray-700">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 10.94l3.71-3.71a.75.75 0 011.08 1.04l-4.25 4.25a.75.75 0 01-1.06 0L5.21 8.27a.75.75 0 01.02-1.06z" clipRule="evenodd" />
+                </svg>
+              </span>
+            </div>
+
 
             <button
               onClick={fetchList}
