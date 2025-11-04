@@ -357,68 +357,70 @@ export default function AdminPage() {
     </div>
 
     {/* スマホ（md未満）: 2段レイアウト */}
-    {/* 1段目: 音 / 注文受付 / 処理済みクリア */}
-    <div className="mt-2 grid grid-cols-3 gap-2 md:hidden">
-      <button
-        onClick={onClickSoundToggle}
-        className={`w-full rounded-lg px-3 py-2 text-sm border ${
-          soundEnabled ? "bg-green-600 text-white" : "bg-white"
-        }`}
-        title="音のオン/オフ"
-      >
-        🔔 音{soundEnabled ? " ON" : " OFF"}
-      </button>
+ {/* 1段目: 音 / 注文受付 / 処理済みクリア */}
+<div className="mt-2 grid grid-cols-3 gap-2 md:hidden">
+  <button
+    onClick={onClickSoundToggle}
+    className={`min-w-0 w-full rounded-lg px-2 py-2 text-[12px] leading-5 font-medium border whitespace-nowrap ${
+      soundEnabled ? "bg-green-600 text-white" : "bg-white text-gray-900"
+    }`}
+    title="音のオン/オフ"
+  >
+    🔔 音{soundEnabled ? " ON" : " OFF"}
+  </button>
 
-      <button
-        onClick={toggleStop}
-        className={`w-full rounded-lg px-3 py-2 text-sm border ${
-          isStopped ? "bg-red-600 text-white border-red-600" : "bg-white"
-        }`}
-        title="注文の受付を停止/再開します"
-      >
-        {isStopped ? "⛔ 注文停止" : "▶︎ 注文受付"}
-      </button>
+  <button
+    onClick={toggleStop}
+    className={`min-w-0 w-full rounded-lg px-2 py-2 text-[12px] leading-5 font-medium border whitespace-nowrap ${
+      isStopped ? "bg-red-600 text-white border-red-600" : "bg-white text-gray-900"
+    }`}
+    title="注文の受付を停止/再開します"
+  >
+    {isStopped ? "⛔ 停止中" : "▶︎ 注文受付"}
+  </button>
 
-      <button
-        onClick={() => setConfirmOpen(true)}
-        className="w-full rounded-lg border px-3 py-2 text-sm bg-white"
-        title="処理済み（完了/キャンセル）を全て削除"
-      >
-        処理済みクリア
-      </button>
-    </div>
+  <button
+    onClick={() => setConfirmOpen(true)}
+    className="min-w-0 w-full rounded-lg border px-2 py-2 text-[12px] leading-5 font-medium bg-white text-gray-900 whitespace-nowrap"
+    title="処理済み（完了/キャンセル）を全て削除"
+  >
+    処理済みクリア
+  </button>
+</div>
+
 
     {/* 2段目: すべて(フィルタ) / 更新 / ログアウト */}
-    <div className="mt-2 grid grid-cols-3 gap-2 md:hidden">
-      <select
-        className="w-full rounded-lg border px-3 py-2 text-sm bg-white"
-        value={statusFilter}
-        onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
-          setStatusFilter(e.target.value as StatusFilter)
-        }
-      >
-        <option value="">すべて</option>
-        <option value="pending">未処理のみ</option>
-        <option value="completed">完了のみ</option>
-        <option value="cancelled">キャンセルのみ</option>
-      </select>
+<div className="mt-2 grid grid-cols-3 gap-2 md:hidden">
+  <select
+    className="min-w-0 w-full rounded-lg border px-2 pr-8 py-2 text-[12px] leading-5 font-medium bg-white text-gray-900 whitespace-nowrap"
+    value={statusFilter}
+    onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
+      setStatusFilter(e.target.value as StatusFilter)
+    }
+  >
+    <option value="">すべて</option>
+    <option value="pending">未処理のみ</option>
+    <option value="completed">完了のみ</option>
+    <option value="cancelled">キャンセルのみ</option>
+  </select>
 
-      <button
-        onClick={fetchList}
-        className="w-full rounded-lg border px-3 py-2 text-sm bg-white"
-        title="更新"
-      >
-        更新
-      </button>
+  <button
+    onClick={fetchList}
+    className="min-w-0 w-full rounded-lg border px-2 py-2 text-[12px] leading-5 font-medium bg-white text-gray-900 whitespace-nowrap"
+    title="更新"
+  >
+    更新
+  </button>
 
-      <button
-        onClick={logout}
-        className="w-full rounded-lg bg-gray-900 text-white px-3 py-2 text-sm"
-        title="ログアウト"
-      >
-        ログアウト
-      </button>
-    </div>
+  <button
+    onClick={logout}
+    className="min-w-0 w-full rounded-lg bg-gray-900 text-white px-2 py-2 text-[12px] leading-5 font-medium whitespace-nowrap"
+    title="ログアウト"
+  >
+    ログアウト
+  </button>
+</div>
+
   </div>
 </header>
 
