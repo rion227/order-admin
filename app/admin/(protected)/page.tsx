@@ -319,7 +319,7 @@ export default function AdminPage() {
                 className="rounded-lg border px-3 py-1.5 text-sm"
                 title="処理済み（完了/キャンセル）を全て削除"
               >
-                処理済みクリア
+                処理済み削除
               </button>
 
               <select
@@ -377,7 +377,7 @@ export default function AdminPage() {
               className="min-w-0 w-full rounded-lg border px-2 py-2 text-[clamp(11px,3.2vw,13px)] leading-5 font-medium bg-white text-gray-900 whitespace-nowrap"
               title="処理済み（完了/キャンセル）を全て削除"
             >
-              処理済みクリア
+              処理済み削除
             </button>
           </div>
 
