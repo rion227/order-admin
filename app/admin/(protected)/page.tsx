@@ -55,7 +55,7 @@ export default function AdminPage() {
   const [error, setError] = useState<string | null>(null);
 
   // 通知系
-  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null); // 通常通知音（音ON時のみ）
   const [soundEnabled, setSoundEnabled] = useState(false);
   const knownPendingIds = useRef<Set<string>>(new Set());
   const initialized = useRef(false);
@@ -283,6 +283,7 @@ export default function AdminPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      {/* 通常通知音（新規入荷時のピロン）。音ON時のみ鳴動 */}
       <audio ref={audioRef} src="/notify.mp3" preload="auto" />
 
       <header className="sticky top-0 z-10 bg-white/80 backdrop-blur border-b">
@@ -392,34 +393,7 @@ export default function AdminPage() {
         )}
       </main>
 
-      {/* 簡易モーダル（処理済みクリアの確認） */}
-      {confirmOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
-          <div className="w-[92%] max-w-md rounded-2xl bg-white p-5 shadow-xl">
-            <h3 className="text-base font-semibold mb-2">処理済みの注文を削除しますか？</h3>
-            <p className="text-sm text-gray-600 mb-4">
-              「完了」と「キャンセル」の注文をすべて削除します。未処理の注文は残ります。
-            </p>
-            <div className="flex justify-end gap-2">
-              <button
-                disabled={confirmBusy}
-                onClick={() => setConfirmOpen(false)}
-                className="rounded-lg border px-3 py-1.5 text-sm"
-              >
-                いいえ
-              </button>
-              <button
-                disabled={confirmBusy}
-                onClick={execResetProcessedOnly}
-                className="rounded-lg bg-red-600 text-white px-3 py-1.5 text-sm disabled:opacity-60"
-              >
-                {confirmBusy ? "削除中…" : "はい、削除する"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
+      {/* ページ内に残しておく（buzz/glow）。点滅はglobals.cssへ */}
       <style jsx global>{`
         @keyframes buzz {
           0% { transform: translate3d(0, 0, 0); }
@@ -445,12 +419,66 @@ function OrderCard({
   buzzing: boolean;
 }) {
   const isDone = order.status !== "pending";
+
+  // 経過時間（秒）を1秒ごとに更新
+  const [elapsed, setElapsed] = useState(0);
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setElapsed((Date.now() - new Date(order.created_at).getTime()) / 1000);
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [order.created_at]);
+
+  // 3分到達で KF4.mp3 を一度だけ再生（ループ）。通知ON/OFF無視
+  const kfAudioRef = useRef<HTMLAudioElement | null>(null);
+  const redNotifiedRef = useRef(false);
+
+  // 赤になった瞬間に再生、完了/キャンセルになったら停止
+  useEffect(() => {
+    const audio = kfAudioRef.current;
+    if (!audio) return;
+
+    if (order.status === "pending" && elapsed >= 180) {
+      if (!redNotifiedRef.current) {
+        redNotifiedRef.current = true;
+        try {
+          audio.currentTime = 0;
+          // ループは属性で設定済み。強制再生（自動再生ポリシーの影響を受ける場合あり）
+          audio.play()?.catch(() => {});
+        } catch {}
+      }
+    } else {
+      // まだ赤ではない、またはpending以外になったら止める
+      if (!audio.paused) {
+        try { audio.pause(); } catch {}
+      }
+      if (order.status !== "pending") {
+        redNotifiedRef.current = false; // 完了/キャンセル後に再度pendingで戻るケースに備えてリセット
+      }
+    }
+  }, [elapsed, order.status]);
+
+  // 経過時間による色付け＆点滅
+  let highlightClass = "";
+  let blinkClass = "";
+  if (order.status === "pending") {
+    if (elapsed >= 180) {
+      highlightClass = "bg-red-50 border-red-300 ring-2 ring-red-400";
+      blinkClass = "blink-red";
+    } else if (elapsed >= 120) {
+      highlightClass = "bg-yellow-50 border-yellow-300";
+    }
+  }
+
   return (
     <li
-      className={`rounded-2xl border bg-white p-4 shadow-sm transition ${
+      className={`rounded-2xl border bg-white p-4 shadow-sm transition ${highlightClass} ${blinkClass} ${
         isDone ? "opacity-60" : ""
       } ${buzzing ? "buzz glow" : ""}`}
     >
+      {/* 3分アラート用の隠しオーディオ（ループ） */}
+      <audio ref={kfAudioRef} src="/KF4.mp3" preload="auto" loop />
+
       <div className="flex items-center gap-2">
         <span className="text-xs text-gray-500">{order.order_no}</span>
         <span

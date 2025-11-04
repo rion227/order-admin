@@ -24,3 +24,26 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* ========= ここから追加（点滅 & バイブ演出用） ========= */
+
+/* 既存のカード揺れアニメ用（必要ならここに移してもOK）
+@keyframes buzz {
+  0% { transform: translate3d(0,0,0); }
+  25% { transform: translate3d(-2px,0,0); }
+  50% { transform: translate3d(2px,0,0); }
+  75% { transform: translate3d(-1px,0,0); }
+  100%{ transform: translate3d(0,0,0); }
+}
+.buzz { animation: buzz 0.6s linear 2; }
+.glow { box-shadow: 0 0 0 3px rgba(59,130,246,0.35); }
+*/
+
+/* 赤カード用の点滅アニメ */
+@keyframes blink {
+  0%, 49% { opacity: 1; }
+  50%, 100% { opacity: 0.45; }
+}
+.blink-red {
+  animation: blink 1s step-start infinite;
+}
