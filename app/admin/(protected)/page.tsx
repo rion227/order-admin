@@ -33,7 +33,6 @@ if (typeof window !== "undefined" && SUPABASE_URL && SUPABASE_ANON) {
   supabase = createClient(SUPABASE_URL, SUPABASE_ANON);
 }
 
-// 安全に JSON を読む（空や非 JSON なら {}）
 async function safeJson<T = any>(res: Response): Promise<T | {}> {
   try {
     const ct = res.headers.get("content-type") || "";
@@ -55,7 +54,7 @@ export default function AdminPage() {
   const [error, setError] = useState<string | null>(null);
 
   // 通知系
-  const audioRef = useRef<HTMLAudioElement | null>(null); // 通常通知音（音ON時のみ）
+  const audioRef = useRef<HTMLAudioElement | null>(null);
   const [soundEnabled, setSoundEnabled] = useState(false);
   const knownPendingIds = useRef<Set<string>>(new Set());
   const initialized = useRef(false);
@@ -185,19 +184,14 @@ export default function AdminPage() {
     }
   }
 
-  // リセット実行（処理済み＝完了/キャンセルのみ削除）
   async function execResetProcessedOnly() {
     setConfirmBusy(true);
     try {
-      const r = await fetch("/api/orders/reset", {
-        method: "POST",
-        credentials: "include",
-      });
+      const r = await fetch("/api/orders/reset", { method: "POST", credentials: "include" });
       const j = (await safeJson(r)) as any;
       if (!r.ok || j?.ok === false) {
         throw new Error(j?.error || `リセットに失敗しました（HTTP ${r.status}）`);
       }
-      // 表示側の一時リセット（未処理は残す）
       setOrders((cur) => cur.filter((o) => o.status === "pending"));
       setError(null);
       await fetchList();
@@ -210,7 +204,6 @@ export default function AdminPage() {
     }
   }
 
-  // 初回＆フィルタ変更時に取得
   useEffect(() => {
     setLoading(true);
     fetchList();
@@ -218,7 +211,6 @@ export default function AdminPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [statusFilter]);
 
-  // 前面5秒 / 背景60秒
   useEffect(() => {
     let timer: ReturnType<typeof setInterval> | null = null;
     const schedule = (ms: number) => {
@@ -241,7 +233,6 @@ export default function AdminPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [statusFilter]);
 
-  // Realtime
   useEffect(() => {
     if (!supabase) return;
     let last = 0;
@@ -283,21 +274,25 @@ export default function AdminPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* 通常通知音（新規入荷時のピロン）。音ON時のみ鳴動 */}
       <audio ref={audioRef} src="/notify.mp3" preload="auto" />
 
-      {/* ===== ヘッダー：PCは横一列、スマホは2段 ===== */}
       <header className="sticky top-0 z-10 border-b bg-white md:bg-white/80 md:backdrop-blur">
         <div className="mx-auto max-w-5xl px-3 py-2">
-          {/* タイトル行（共通） */}
+          {/* タイトル行 */}
           <div className="flex items-center gap-3">
             <h1 className="text-lg md:text-xl font-semibold text-gray-900">注文管理</h1>
 
-            <span className="ml-2 inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs md:text-sm bg-white">
-              未処理 <span className="ml-1 font-bold">{pendingCount}</span>
+            {/* ▶ PC用バッジ */}
+            <span className="ml-2 hidden md:inline-flex items-center rounded-full border px-2.5 py-0.5 text-sm bg-white text-gray-900">
+              未処理 <span className="ml-1 font-bold tabular-nums">{pendingCount}</span>
             </span>
 
-            {/* PC: 右寄せのコントロール（従来のUI） */}
+            {/* ▶ モバイル用バッジ（自動縮小） */}
+            <span className="ml-2 inline-flex md:hidden items-center rounded-full border border-gray-300 bg-white px-2 py-0.5 text-[clamp(11px,3.2vw,13px)] leading-5 text-gray-900 whitespace-nowrap">
+              未処理 <span className="ml-1 font-bold tabular-nums">{pendingCount}</span>
+            </span>
+
+            {/* PC: 右寄せコントロール */}
             <div className="ml-auto hidden md:flex items-center gap-2">
               <button
                 onClick={onClickSoundToggle}
@@ -309,7 +304,6 @@ export default function AdminPage() {
                 🔔 {soundEnabled ? "音 ON" : "音 OFF"}
               </button>
 
-              {/* 注文停止 */}
               <button
                 onClick={toggleStop}
                 className={`rounded-lg px-3 py-1.5 text-sm border ${
@@ -320,7 +314,6 @@ export default function AdminPage() {
                 {isStopped ? "⛔ 注文STOP中" : "▶︎ 注文受付中"}
               </button>
 
-              {/* 処理済みクリア */}
               <button
                 onClick={() => setConfirmOpen(true)}
                 className="rounded-lg border px-3 py-1.5 text-sm"
@@ -329,7 +322,6 @@ export default function AdminPage() {
                 処理済みクリア
               </button>
 
-              {/* フィルタ */}
               <select
                 className="rounded-lg border px-3 py-1.5 text-sm bg-white"
                 value={statusFilter}
@@ -357,12 +349,12 @@ export default function AdminPage() {
             </div>
           </div>
 
-          {/* スマホ（md未満）: 2段レイアウト */}
-          {/* 1段目: 音 / 注文受付 / 処理済みクリア */}
+          {/* スマホ：2段レイアウト */}
+          {/* 1段目 */}
           <div className="mt-2 grid grid-cols-3 gap-2 md:hidden">
             <button
               onClick={onClickSoundToggle}
-              className={`min-w-0 w-full rounded-lg px-2 py-2 text-[12px] leading-5 font-medium border whitespace-nowrap ${
+              className={`min-w-0 w-full rounded-lg px-2 py-2 text-[clamp(11px,3.2vw,13px)] leading-5 font-medium border whitespace-nowrap ${
                 soundEnabled ? "bg-green-600 text-white" : "bg-white text-gray-900"
               }`}
               title="音のオン/オフ"
@@ -372,7 +364,7 @@ export default function AdminPage() {
 
             <button
               onClick={toggleStop}
-              className={`min-w-0 w-full rounded-lg px-2 py-2 text-[12px] leading-5 font-medium border whitespace-nowrap ${
+              className={`min-w-0 w-full rounded-lg px-2 py-2 text-[clamp(11px,3.2vw,13px)] leading-5 font-medium border whitespace-nowrap ${
                 isStopped ? "bg-red-600 text-white border-red-600" : "bg-white text-gray-900"
               }`}
               title="注文の受付を停止/再開します"
@@ -382,17 +374,17 @@ export default function AdminPage() {
 
             <button
               onClick={() => setConfirmOpen(true)}
-              className="min-w-0 w-full rounded-lg border px-2 py-2 text-[12px] leading-5 font-medium bg-white text-gray-900 whitespace-nowrap"
+              className="min-w-0 w-full rounded-lg border px-2 py-2 text-[clamp(11px,3.2vw,13px)] leading-5 font-medium bg-white text-gray-900 whitespace-nowrap"
               title="処理済み（完了/キャンセル）を全て削除"
             >
               処理済みクリア
             </button>
           </div>
 
-          {/* 2段目: すべて(フィルタ) / 更新 / ログアウト */}
+          {/* 2段目 */}
           <div className="mt-2 grid grid-cols-3 gap-2 md:hidden">
             <select
-              className="min-w-0 w-full rounded-lg border px-2 pr-8 py-2 text-[12px] leading-5 font-medium bg-white text-gray-900 whitespace-nowrap"
+              className="min-w-0 w-full rounded-lg border px-2 pr-8 py-2 text-[clamp(11px,3.2vw,13px)] leading-5 font-medium bg-white text-gray-900 whitespace-nowrap"
               value={statusFilter}
               onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
                 setStatusFilter(e.target.value as StatusFilter)
@@ -406,7 +398,7 @@ export default function AdminPage() {
 
             <button
               onClick={fetchList}
-              className="min-w-0 w-full rounded-lg border px-2 py-2 text-[12px] leading-5 font-medium bg-white text-gray-900 whitespace-nowrap"
+              className="min-w-0 w-full rounded-lg border px-2 py-2 text-[clamp(11px,3.2vw,13px)] leading-5 font-medium bg-white text-gray-900 whitespace-nowrap"
               title="更新"
             >
               更新
@@ -414,7 +406,7 @@ export default function AdminPage() {
 
             <button
               onClick={logout}
-              className="min-w-0 w-full rounded-lg bg-gray-900 text-white px-2 py-2 text-[12px] leading-5 font-medium whitespace-nowrap"
+              className="min-w-0 w-full rounded-lg bg-gray-900 text-white px-2 py-2 text-[clamp(11px,3.2vw,13px)] leading-5 font-medium whitespace-nowrap"
               title="ログアウト"
             >
               ログアウト
@@ -436,7 +428,6 @@ export default function AdminPage() {
           <>
             {grouped.pending.length > 0 && (
               <>
-                {/* 見出しを濃く＆モバイルは少し大きく */}
                 <h2 className="mb-2 text-base md:text-sm font-semibold text-gray-900">未処理</h2>
                 <ul className="mb-6 grid gap-3">
                   {grouped.pending.map((o) => (
@@ -464,7 +455,7 @@ export default function AdminPage() {
         )}
       </main>
 
-      {/* 確認モーダル：スマホで切れない＆濃いめ */}
+      {/* 確認モーダル */}
       {confirmOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
           <div
@@ -516,7 +507,6 @@ function OrderCard({
 }) {
   const isDone = order.status !== "pending";
 
-  // 経過時間（秒）を1秒ごとに更新
   const [elapsed, setElapsed] = useState(0);
   useEffect(() => {
     const timer = setInterval(() => {
@@ -525,7 +515,6 @@ function OrderCard({
     return () => clearInterval(timer);
   }, [order.created_at]);
 
-  // 3分到達で KF4.mp3 を一度だけ再生（ループ）。通知ON/OFF無視
   const kfAudioRef = useRef<HTMLAudioElement | null>(null);
   const redNotifiedRef = useRef(false);
 
@@ -538,21 +527,19 @@ function OrderCard({
         redNotifiedRef.current = true;
         try {
           audio.currentTime = 0;
-          audio.play()?.catch(() => {}); // ループは属性で指定済み
+          audio.play()?.catch(() => {});
         } catch {}
       }
     } else {
-      // まだ赤ではない、またはpending以外になったら止める
       if (!audio.paused) {
         try { audio.pause(); } catch {}
       }
       if (order.status !== "pending") {
-        redNotifiedRef.current = false; // 再入場に備える
+        redNotifiedRef.current = false;
       }
     }
   }, [elapsed, order.status]);
 
-  // 経過時間による色付け＆点滅
   let highlightClass = "";
   let blinkClass = "";
   if (order.status === "pending") {
@@ -570,7 +557,6 @@ function OrderCard({
         isDone ? "opacity-60" : ""
       } ${buzzing ? "buzz glow" : ""}`}
     >
-      {/* 3分アラート用の隠しオーディオ（ループ） */}
       <audio ref={kfAudioRef} src="/KF4.mp3" preload="auto" loop />
 
       <div className="flex items-center gap-2">
